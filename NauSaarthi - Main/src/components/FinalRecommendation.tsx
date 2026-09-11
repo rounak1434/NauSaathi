@@ -6,31 +6,38 @@ interface Props {
 }
 
 export default function FinalRecommendation({ data }: Props) {
-  const config = {
-    BOOK_NOW: {
-      icon: CheckCircle2,
-      accentBg: 'bg-emerald-50',
-      accentBorder: 'border-emerald-200',
-      accentText: 'text-emerald-700',
-      iconBg: 'bg-emerald-600',
-    },
-    WAIT: {
-      icon: Clock,
-      accentBg: 'bg-amber-50',
-      accentBorder: 'border-amber-200',
-      accentText: 'text-amber-700',
-      iconBg: 'bg-amber-500',
-    },
-    CONSIDER_ALTERNATIVE_WINDOW: {
-      icon: AlertTriangle,
-      accentBg: 'bg-blue-50',
-      accentBorder: 'border-blue-200',
-      accentText: 'text-blue-700',
-      iconBg: 'bg-blue-600',
-    },
-  };
+  const isBookNow =
+    data.verdict === 'BOOK_NOW' ||
+    (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK'));
 
-  const selectedConfig = config[data.verdict] ?? config.CONSIDER_ALTERNATIVE_WINDOW;
+  const isWait =
+    data.verdict === 'WAIT' ||
+    (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('WAIT'));
+
+  const selectedConfig = isBookNow
+    ? {
+        icon: CheckCircle2,
+        accentBg: 'bg-emerald-50',
+        accentBorder: 'border-emerald-200',
+        accentText: 'text-emerald-800',
+        iconBg: 'bg-emerald-600',
+      }
+    : isWait
+    ? {
+        icon: Clock,
+        accentBg: 'bg-amber-50',
+        accentBorder: 'border-amber-200',
+        accentText: 'text-amber-800',
+        iconBg: 'bg-amber-500',
+      }
+    : {
+        icon: AlertTriangle,
+        accentBg: 'bg-blue-50',
+        accentBorder: 'border-blue-200',
+        accentText: 'text-blue-800',
+        iconBg: 'bg-blue-600',
+      };
+
   const Icon = selectedConfig.icon;
 
   return (
@@ -42,7 +49,7 @@ export default function FinalRecommendation({ data }: Props) {
         className={`${selectedConfig.accentBg} ${selectedConfig.accentBorder} border rounded-lg p-5 mb-5 flex items-center gap-4`}
       >
         <div
-          className={`w-12 h-12 rounded-lg ${selectedConfig.iconBg} flex items-center justify-center flex-shrink-0`}
+          className={`w-12 h-12 rounded-lg ${selectedConfig.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}
         >
           <Icon className="w-6 h-6 text-white" />
         </div>
@@ -57,7 +64,11 @@ export default function FinalRecommendation({ data }: Props) {
         <ul className="space-y-2">
           {data.reasons.map((reason, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 leading-relaxed">
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#1e3a5f] flex-shrink-0" />
+              <span
+                className={`mt-1.5 w-1.5 h-1.5 rounded-full ${
+                  isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
+                } flex-shrink-0`}
+              />
               {reason}
             </li>
           ))}
