@@ -56,7 +56,8 @@ function mapWindowToDuration(window: CharteringWindowOption): number {
 export async function analyzeCharteringRequirement(
   input: CargoRequirement
 ): Promise<AnalysisResponse> {
-  const durationMonths = mapWindowToDuration(input.charteringWindow);
+  const isSevenDays = input.charteringWindow === 'within_7_days';
+  const durationMonths = isSevenDays ? 0 : mapWindowToDuration(input.charteringWindow);
 
   const payload = {
     cargo_type: 'Coal',
@@ -64,6 +65,7 @@ export async function analyzeCharteringRequirement(
     origin: input.origin,
     destination: input.destination,
     contract_duration_months: durationMonths,
+    chartering_window: input.charteringWindow,
   };
 
   let response: Response;
@@ -256,10 +258,13 @@ export async function analyzeCharteringRequirement(
     cwAction = 'BOOK_NOW';
   }
 
-  const totalDays = (cw.duration_months || durationMonths) * 30;
+  const totalDays = isSevenDays ? 7 : (cw.duration_months || durationMonths) * 30;
   let idealStart = 0;
   let idealEnd = totalDays;
-  if (cwAction === 'WAIT') {
+  if (isSevenDays) {
+    idealStart = 0;
+    idealEnd = 7;
+  } else if (cwAction === 'WAIT') {
     idealStart = Math.round(totalDays * 0.4);
     idealEnd = totalDays;
   } else if (cwAction === 'BOOK_NOW') {

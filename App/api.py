@@ -153,11 +153,16 @@ class RecommendationRequest(BaseModel):
         examples=["Dhamra, India"],
     )
     contract_duration_months: int = Field(
-        ...,
-        ge=1,
+        default=1,
+        ge=0,
         le=24,
-        description="Requested charter duration in months.",
+        description="Requested charter duration in months (0 for 7-day prompt spot).",
         examples=[1],
+    )
+    chartering_window: str | None = Field(
+        default=None,
+        description="Explicit chartering window option ('within_7_days', 'within_30_days', 'within_60_days', 'within_90_days').",
+        examples=["within_7_days"],
     )
 
     @field_validator("cargo_type", "origin", "destination", mode="before")
@@ -341,6 +346,7 @@ async def recommendation(
             origin=request_body.origin,
             destination=request_body.destination,
             contract_duration_months=request_body.contract_duration_months,
+            chartering_window=request_body.chartering_window,
         )
 
     except ValueError as exc:

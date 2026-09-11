@@ -54,7 +54,7 @@ export interface FreightForecast {
 
 // ─── Vessel Types ──────────────────────────────────────────────────────
 
-export type VesselClass = 'Handysize' | 'Supramax' | 'Panamax' | 'Capesize';
+export type VesselClass = 'Handysize' | 'Supramax' | 'Panamax' | 'Capesize' | 'No Single-Vessel Fit';
 export type SuitabilityStatus = 'Suitable' | 'Not Suitable' | 'Recommended';
 
 export interface VesselSuitability {

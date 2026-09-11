@@ -48,16 +48,18 @@ function ConfidenceBadge({ level }: { level: string }) {
 // Custom tooltip
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  const d = payload[0];
-  const isForecast = d.payload.forecast !== null && d.payload.forecast !== undefined;
-  const val = d.payload.historical ?? d.payload.forecast;
+  const item = payload[0]?.payload;
+  if (!item) return null;
+  const isBridge = item.historical !== null && item.forecast !== null;
+  const val = item.forecast ?? item.historical;
+  const tag = isBridge ? 'Current Observation' : item.isForecast ? 'Forecast' : 'Historical';
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-md px-3 py-2 text-xs">
       <p className="font-semibold text-gray-700 mb-0.5">{label}</p>
-      <p className="text-[#1e3a5f]">
+      <p className="text-[#1e3a5f] font-medium">
         ${val?.toFixed(2)} / MT
-        <span className="ml-1 text-gray-400">
-          ({isForecast && d.payload.historical === null ? 'Forecast' : 'Historical'})
+        <span className="ml-1 text-gray-400 font-normal">
+          ({tag})
         </span>
       </p>
     </div>
@@ -66,38 +68,33 @@ function ChartTooltip({ active, payload, label }: any) {
 
 export default function FreightForecastCard({ data }: Props) {
   // Build combined dataset with separate historical / forecast keys.
-  // The "bridge" point (last historical = first forecast) has both keys set
-  // so both lines connect through it.
-  const historicalPoints = data.chartData.filter((d) => d.type === 'historical');
-  const forecastPoints = data.chartData.filter((d) => d.type === 'forecast');
-  const bridgePoint = historicalPoints[historicalPoints.length - 1];
-
-  const combined = [
-    ...historicalPoints.map((d) => ({
+  // The bridge point (last historical = current market observation) shares both
+  // keys so the dashed forecast line smoothly connects from the current observation.
+  const combined = data.chartData.map((d, idx) => {
+    const isLastHistorical =
+      d.type === 'historical' &&
+      (idx === data.chartData.length - 1 || data.chartData[idx + 1]?.type === 'forecast');
+    return {
       date: d.date,
-      historical: d.rate,
-      forecast: null as number | null,
-    })),
-    ...forecastPoints.map((d, i) => ({
-      date: d.date,
-      historical: i === 0 ? (bridgePoint?.rate ?? null) : null as number | null,
-      forecast: d.rate,
-    })),
-  ];
+      historical: d.type === 'historical' ? d.rate : null,
+      forecast: d.type === 'forecast' ? d.rate : isLastHistorical ? d.rate : null,
+      isForecast: d.type === 'forecast',
+    };
+  });
 
-  // Deduplicate if bridge and first forecast share same date
-  // (give historical value to the bridge row, keep forecast on the forecast row)
-  // Actually we need the last historical row to also carry the forecast value for a smooth bridge
-  if (combined.length > 0 && forecastPoints.length > 0) {
-    // Find the last historical entry and assign the first forecast rate to it
-    const lastHistIdx = historicalPoints.length - 1;
-    if (lastHistIdx >= 0) {
-      combined[lastHistIdx].forecast = forecastPoints[0].rate;
-    }
-  }
+  const bridgePoint = data.chartData.find((d, idx) =>
+    d.type === 'historical' &&
+    (idx === data.chartData.length - 1 || data.chartData[idx + 1]?.type === 'forecast')
+  );
+  const todayLabel = bridgePoint?.date ?? (data.chartData[0]?.date ?? '');
 
-  // Find the "today" date label for reference line
-  const todayLabel = bridgePoint?.date ?? '';
+  // Dynamic Y-axis scale based on actual rate range
+  const allRates = data.chartData.map((d) => d.rate).filter((r) => !isNaN(r) && r > 0);
+  const minRate = allRates.length > 0 ? Math.min(...allRates) : 0;
+  const maxRate = allRates.length > 0 ? Math.max(...allRates) : 50;
+  const yPadding = (maxRate - minRate) * 0.15 || 2;
+  const yMin = Math.max(0, Math.floor(minRate - yPadding));
+  const yMax = Math.ceil(maxRate + yPadding);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-fade-in">
@@ -138,7 +135,7 @@ export default function FreightForecastCard({ data }: Props) {
               tickLine={false}
               tickFormatter={(v: number) => `$${v}`}
               width={48}
-              domain={['auto', 'auto']}
+              domain={[yMin, yMax]}
             />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine

@@ -341,6 +341,7 @@ def get_route_distance_nm(origin_key: str, destination_key: str) -> tuple[float,
     """
     Returns (distance_nm, provenance).
     Gladstone -> Dhamra returns exact 5827.27 nm with VERIFIED status.
+    Raises ValueError("UNSUPPORTED_ROUTE: ...") if origin or destination is unknown.
     """
     o_norm = _normalize(origin_key)
     d_norm = _normalize(destination_key)
@@ -349,18 +350,30 @@ def get_route_distance_nm(origin_key: str, destination_key: str) -> tuple[float,
         return 5827.27, DataProvenance.VERIFIED
 
     # Match registered origin country or port substring
-    base = 5000.0
+    base = None
     for k, v in BASE_DISTANCES.items():
         if k in o_norm:
             base = v
             break
 
+    if base is None:
+        raise ValueError(
+            f"UNSUPPORTED_ROUTE: Unknown origin '{origin_key}'. "
+            f"Supported origins: {sorted([p.country for p in ORIGIN_REGISTRY.values()])}."
+        )
+
     # Match registered destination port substring
-    offset = 0.0
+    offset = None
     for k, v in PORT_DISTANCE_OFFSET.items():
         if k in d_norm:
             offset = v
             break
+
+    if offset is None:
+        raise ValueError(
+            f"UNSUPPORTED_ROUTE: Unknown destination '{destination_key}'. "
+            f"Supported destinations: {sorted([p.name for p in DESTINATION_PORT_REGISTRY.values()])}."
+        )
 
     dist = round(base + offset, 2)
     return dist, DataProvenance.DERIVED
@@ -375,42 +388,32 @@ def _normalize(val: Any) -> str:
 
 
 def find_origin_profile(origin_name: str) -> OriginProfile:
+    """
+    Looks up the origin profile from the validated registry.
+    Raises ValueError("UNSUPPORTED_ROUTE: ...") if no registered origin matches.
+    """
     norm = _normalize(origin_name)
     for key, prof in ORIGIN_REGISTRY.items():
         if key in norm or _normalize(prof.representative_port) in norm or _normalize(prof.country) in norm:
             return prof
-    # Default fallback
-    return OriginProfile(
-        country=origin_name,
-        representative_port="Port " + origin_name,
-        port_name_full=origin_name,
-        max_loa_m=280.0,
-        max_beam_m=45.0,
-        max_draft_m=15.0,
-        turnaround_hours=24.0,
-        provenance=DataProvenance.SCENARIO,
+    raise ValueError(
+        f"UNSUPPORTED_ROUTE: Origin '{origin_name}' is not in the validated origin registry. "
+        f"Supported origins: {sorted([p.country for p in ORIGIN_REGISTRY.values()])}."
     )
 
 
 def find_destination_profile(dest_name: str) -> DestinationPortProfile:
+    """
+    Looks up the destination port profile from the validated registry.
+    Raises ValueError("UNSUPPORTED_ROUTE: ...") if no registered destination matches.
+    """
     norm = _normalize(dest_name)
     for key, prof in DESTINATION_PORT_REGISTRY.items():
         if key in norm or _normalize(prof.name) in norm:
             return prof
-    # Default fallback
-    return DestinationPortProfile(
-        name=dest_name,
-        state="India",
-        port_name_full=dest_name,
-        max_loa_m=260.0,
-        max_beam_m=42.0,
-        max_draft_m=14.0,
-        max_dwt_tonnes=80_000,
-        discharge_rate_tpd=25_000,
-        turnaround_hours=24.0,
-        mechanized=True,
-        notes="General Indian East Coast bulk port profile.",
-        provenance=DataProvenance.SCENARIO,
+    raise ValueError(
+        f"UNSUPPORTED_ROUTE: Destination '{dest_name}' is not in the validated destination port registry. "
+        f"Supported destinations: {sorted([p.name for p in DESTINATION_PORT_REGISTRY.values()])}."
     )
 
 

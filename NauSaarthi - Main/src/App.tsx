@@ -49,7 +49,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb]">
+    <div className="min-h-screen w-full bg-[#f8f9fb]">
       <Header
         activePage={view === 'analysis' ? 'analysis' : 'overview'}
         onNavigate={handleNavigate}

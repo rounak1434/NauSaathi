@@ -10,9 +10,9 @@ interface Props {
 
 export default function HomePage({ initialValues, onSubmit, loading }: Props) {
   return (
-    <div className="min-h-[calc(100vh-57px)] w-full max-w-6xl mx-auto flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-10">
+    <div className="min-h-[calc(100vh-57px)] w-full flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-10">
       {/* Hero */}
-      <div className="text-center mb-8 animate-fade-in">
+      <div className="w-full flex flex-col items-center text-center mb-8 animate-fade-in">
         <div className="flex items-center justify-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
             <Anchor className="w-5 h-5 text-white" strokeWidth={2.2} />

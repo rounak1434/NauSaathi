@@ -7,7 +7,7 @@ interface Props {
 
 export default function CharteringWindowCard({ data }: Props) {
   // Timeline markers
-  const totalDays = Math.max(data.timelineDays + 5, 30);
+  const totalDays = data.timelineDays <= 7 ? Math.max(data.timelineDays, 7) : Math.max(data.timelineDays + 5, 30);
   const todayPct = 0;
   const idealStartPct = ((data.idealWindowStart ?? 0) / totalDays) * 100;
   const idealEndPct = ((data.idealWindowEnd ?? data.timelineDays) / totalDays) * 100;
