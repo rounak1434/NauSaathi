@@ -112,11 +112,35 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+# ============================================================
+# STARTUP PRE-WARMING
+# ============================================================
+
+@app.on_event("startup")
+async def startup_prewarm() -> None:
+    """
+    Pre-warm pipeline engines and populate in-memory caches on server boot
+    so that user requests execute with minimal latency.
+    """
+    try:
+        get_sail_recommendation(
+            cargo_type="Coal",
+            cargo_tonnes=75000,
+            origin="Australia",
+            destination="Dhamra",
+            contract_duration_months=1,
+            chartering_window="within_30_days",
+        )
+    except Exception as exc:
+        print(f"[startup] Warm-up advisory: {exc}")
+
 
 
 # ============================================================

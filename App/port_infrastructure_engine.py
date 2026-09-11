@@ -192,11 +192,18 @@ def _normalize(value: Any) -> str:
     return str(value).strip().lower()
 
 
+_BENCHMARKS_CACHE: dict[str, VesselDimensionsProfile] | None = None
+
+
 def load_verified_vessel_benchmarks() -> dict[str, VesselDimensionsProfile]:
     """
     Load vessel benchmark dimensions from STEP8E_VESSEL_FEASIBILITY.csv.
     (VERIFIED PROJECT DATA / EXTERNAL REFERENCE)
     """
+    global _BENCHMARKS_CACHE
+    if _BENCHMARKS_CACHE is not None:
+        return dict(_BENCHMARKS_CACHE)
+
     path = FILES["feasibility"]
     if not path.exists():
         raise FileNotFoundError(f"Required feasibility file not found: {path}")
@@ -235,7 +242,8 @@ def load_verified_vessel_benchmarks() -> dict[str, VesselDimensionsProfile]:
             notes=notes,
         )
 
-    return benchmarks
+    _BENCHMARKS_CACHE = benchmarks
+    return dict(benchmarks)
 
 
 def get_known_port_profile(port_name: str) -> PortInfrastructureProfile:

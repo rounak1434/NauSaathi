@@ -157,11 +157,16 @@ def _to_float_or_none(value: Any) -> float | None:
         return None
 
 
+_CACHE: dict[str, pd.DataFrame] = {}
+
+
 def _load_and_validate(key: str, required_cols: set[str]) -> pd.DataFrame:
     """
     Load a pipeline CSV and validate that required columns exist.
     Raises FileNotFoundError or ValueError with a clear message.
     """
+    if key in _CACHE:
+        return _CACHE[key].copy()
     path = FILES[key]
     if not path.exists():
         raise FileNotFoundError(
@@ -173,7 +178,8 @@ def _load_and_validate(key: str, required_cols: set[str]) -> pd.DataFrame:
         raise ValueError(
             f"vessel_optimization_engine: {path.name} missing columns: {sorted(missing)}"
         )
-    return df
+    _CACHE[key] = df
+    return df.copy()
 
 
 # ============================================================

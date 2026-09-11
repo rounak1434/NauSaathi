@@ -376,6 +376,9 @@ def compare_commercial_options(
 # PIPELINE BASELINE COMMERCIAL REPORT (MODE 1)
 # ============================================================
 
+_PARTIAL_ECON_CACHE: pd.DataFrame | None = None
+
+
 def get_pipeline_baseline_commercial_option(
     month_str: str = "2025-12",
     vessel_type: str = "Panamax",
@@ -384,12 +387,16 @@ def get_pipeline_baseline_commercial_option(
     Constructs the Mode 1 pipeline baseline CommercialOption from STEP8G.
     Commercial freight rate and port costs are preserved as UNAVAILABLE (None).
     """
-    partial_path = FILES["partial_econ"]
-    if not partial_path.exists():
-        raise FileNotFoundError(f"Required file not found: {partial_path}")
-
-    df = pd.read_csv(partial_path)
-    df["Month"] = pd.to_datetime(df["Month"], errors="coerce")
+    global _PARTIAL_ECON_CACHE
+    if _PARTIAL_ECON_CACHE is not None:
+        df = _PARTIAL_ECON_CACHE
+    else:
+        partial_path = FILES["partial_econ"]
+        if not partial_path.exists():
+            raise FileNotFoundError(f"Required file not found: {partial_path}")
+        df = pd.read_csv(partial_path)
+        df["Month"] = pd.to_datetime(df["Month"], errors="coerce")
+        _PARTIAL_ECON_CACHE = df
 
     # Filter for vessel and month
     v_rows = df[

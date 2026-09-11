@@ -22,6 +22,23 @@ const API_BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ||
   'http://127.0.0.1:8000';
 
+let warmedUp = false;
+
+/**
+ * Asynchronously pre-warms the backend on initial application mount.
+ * Triggers Render / backend container wake-up without blocking homepage render.
+ */
+export function prewarmBackend(): void {
+  if (warmedUp) return;
+  warmedUp = true;
+  fetch(`${API_BASE_URL}/health`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  }).catch(() => {
+    // Non-blocking, silent catch: warm-up failure must never disrupt the user experience
+  });
+}
+
 // ─── Helper Mappings ───────────────────────────────────────────────────
 
 /**

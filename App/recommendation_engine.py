@@ -101,11 +101,18 @@ def _normalize(val: Any) -> str:
     return str(val or "").strip().lower()
 
 
+_CSV_CACHE: dict[str, pd.DataFrame] = {}
+
+
 def _load_csv(key: str) -> pd.DataFrame:
+    if key in _CSV_CACHE:
+        return _CSV_CACHE[key].copy()
     path = FILES.get(key)
     if not path or not path.exists():
         return pd.DataFrame()
-    return pd.read_csv(path)
+    df = pd.read_csv(path)
+    _CSV_CACHE[key] = df
+    return df.copy()
 
 
 # ============================================================

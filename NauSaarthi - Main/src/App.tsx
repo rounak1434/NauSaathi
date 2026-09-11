@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
 import AnalysisPage from './pages/AnalysisPage';
 import LoadingState from './components/LoadingState';
-import { analyzeCharteringRequirement } from './services/api';
+import { analyzeCharteringRequirement, prewarmBackend } from './services/api';
 import type { CargoRequirement, AnalysisResponse } from './types';
 
 type AppView = 'overview' | 'loading' | 'analysis';
@@ -13,21 +13,33 @@ export default function App() {
   const [lastInput, setLastInput] = useState<Partial<CargoRequirement>>({});
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const activeRequestIdRef = useRef<number>(0);
+
+  // Non-blocking pre-warm on initial application mount
+  useEffect(() => {
+    prewarmBackend();
+  }, []);
 
   async function handleSubmit(data: CargoRequirement) {
+    const requestId = ++activeRequestIdRef.current;
     setLastInput(data);
     setView('loading');
     setError(null);
 
     try {
       const result = await analyzeCharteringRequirement(data);
-      setAnalysis(result);
-      setView('analysis');
+      if (requestId === activeRequestIdRef.current) {
+        setAnalysis(result);
+        setView('analysis');
+      }
     } catch (err: unknown) {
-      console.error('Analysis failed:', err);
-      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
-      setError(msg);
-      setView('overview');
+      if (requestId === activeRequestIdRef.current) {
+        console.error('Analysis failed:', err);
+        const msg =
+          err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+        setError(msg);
+        setView('overview');
+      }
     }
   }
 

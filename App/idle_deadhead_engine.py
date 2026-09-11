@@ -484,12 +484,18 @@ def evaluate_alternative_employment(
 # DATA LOADERS
 # ============================================================
 
-def _load_and_validate(key: str, required_cols: set) -> pd.DataFrame:
+_CACHE: dict[str, pd.DataFrame] = {}
+
+
+def _load_and_validate(key: str, required_cols: set[str]) -> pd.DataFrame:
     """
-    Load a pipeline CSV and validate required columns.
+    Load a pipeline CSV and validate that required columns exist.
     Raises FileNotFoundError or ValueError with a clear message.
     Normalises the Month column to datetime.
     """
+    if key in _CACHE:
+        return _CACHE[key].copy()
+
     path = FILES[key]
 
     if not path.exists():
@@ -507,7 +513,8 @@ def _load_and_validate(key: str, required_cols: set) -> pd.DataFrame:
         )
 
     df["Month"] = pd.to_datetime(df["Month"], errors="coerce")
-    return df
+    _CACHE[key] = df
+    return df.copy()
 
 
 def _extract_panamax_baseline(econ: pd.DataFrame) -> dict[str, Any]:
