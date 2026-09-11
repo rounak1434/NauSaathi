@@ -48,20 +48,34 @@ export function prewarmBackend(): void {
  * - Within 60 Days -> 2 months
  * - Within 90 Days -> 3 months
  */
-function mapWindowToDuration(window: CharteringWindowOption): number {
-  switch (window) {
-    case 'within_7_days':
-      return 1;
-    case 'within_30_days':
-      return 1;
-    case 'within_60_days':
-      return 2;
-    case 'within_90_days':
-      return 3;
-    case 'custom':
-    default:
-      return 1;
+const CONTRACT_DURATION_MONTHS: Record<CharteringWindowOption, number> = {
+  within_7_days: 1,
+  within_30_days: 1,
+  within_60_days: 2,
+  within_90_days: 3,
+  custom: 1,
+};
+
+const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/**
+ * Deterministically formats YYYY-MM into a display label (e.g. "Sep 26")
+ * without being susceptible to browser UTC timezone offset shifts.
+ */
+function formatMonthLabel(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length >= 2) {
+    const year = parts[0].slice(-2);
+    const monthNum = parseInt(parts[1], 10);
+    if (monthNum >= 1 && monthNum <= 12) {
+      return `${MONTH_NAMES[monthNum - 1]} ${year}`;
+    }
   }
+  return dateStr;
 }
 
 // ─── Analysis Service ──────────────────────────────────────────────────
@@ -73,14 +87,15 @@ function mapWindowToDuration(window: CharteringWindowOption): number {
 export async function analyzeCharteringRequirement(
   input: CargoRequirement
 ): Promise<AnalysisResponse> {
+  const durationMonths =
+    CONTRACT_DURATION_MONTHS[input.charteringWindow] ?? 1;
   const isSevenDays = input.charteringWindow === 'within_7_days';
-  const durationMonths = isSevenDays ? 0 : mapWindowToDuration(input.charteringWindow);
 
   const payload = {
     cargo_type: 'Coal',
-    cargo_tonnes: input.cargoQuantityMT,
+    cargo_tonnes: Number(input.cargoQuantityMT),
     origin: input.origin,
-    destination: input.destination.replace(/[\u2010-\u2015]/g, '-'),
+    destination: input.destination,
     contract_duration_months: durationMonths,
     chartering_window: input.charteringWindow,
   };
@@ -122,9 +137,40 @@ export async function analyzeCharteringRequirement(
 
   const backend = await response.json();
 
-  // 1. Freight Forecast
-  const fc = backend.forecast ?? {};
-  const timeline = Array.isArray(fc.timeline) ? fc.timeline : [];
+  if (!backend || typeof backend !== 'object') {
+    throw new Error('Malformed backend response: root payload is invalid.');
+  }
+
+  // 1. Freight Forecast validation & mapping
+  if (
+    !backend.forecast ||
+    !Array.isArray(backend.forecast.timeline) ||
+    backend.forecast.timeline.length === 0
+  ) {
+    throw new Error('Backend response is missing required freight forecast timeline data.');
+  }
+
+  const fc = backend.forecast;
+  if (typeof fc.current_rate !== 'number' || isNaN(fc.current_rate)) {
+    throw new Error('Backend response is missing a valid current_rate in forecast.');
+  }
+  if (typeof fc.expected_rate !== 'number' || isNaN(fc.expected_rate)) {
+    throw new Error('Backend response is missing a valid expected_rate in forecast.');
+  }
+
+  const timeline = fc.timeline;
+  const chartData: FreightDataPoint[] = timeline.map(
+    (pt: {
+      date: string;
+      estimated_freight_usd_pmt: number;
+      is_forecast?: boolean;
+    }) => ({
+      date: formatMonthLabel(pt.date),
+      rawDate: pt.date,
+      rate: Number(pt.estimated_freight_usd_pmt),
+      type: pt.is_forecast ? ('forecast' as const) : ('historical' as const),
+    })
+  );
 
   const trendRaw = String(fc.market_trend || '').toUpperCase();
   let trend: MarketTrend = 'STABLE';
@@ -151,27 +197,9 @@ export async function analyzeCharteringRequirement(
     confidence = 'LOW';
   }
 
-  const chartData: FreightDataPoint[] = timeline.map(
-    (pt: {
-      date: string;
-      estimated_freight_usd_pmt: number;
-      is_forecast?: boolean;
-    }) => {
-      const d = new Date(pt.date + '-01');
-      const label = isNaN(d.getTime())
-        ? pt.date
-        : d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-      return {
-        date: label,
-        rate: Number(pt.estimated_freight_usd_pmt ?? 0),
-        type: pt.is_forecast ? ('forecast' as const) : ('historical' as const),
-      };
-    }
-  );
-
   const freightForecast: FreightForecast = {
-    currentRatePerMT: Number(fc.current_rate ?? 0),
-    expectedRatePerMT: Number(fc.expected_rate ?? 0),
+    currentRatePerMT: Number(fc.current_rate),
+    expectedRatePerMT: Number(fc.expected_rate),
     trend,
     confidence,
     chartData,
@@ -181,13 +209,24 @@ export async function analyzeCharteringRequirement(
     expectedRateDataStatus: fc.expected_rate_data_status,
   };
 
-  // 2. Vessel Recommendation
-  const vesselData = backend.vessel ?? {};
-  const recommendedClass = (vesselData.recommended_class || 'Panamax') as VesselClass;
+  // 2. Vessel Recommendation validation & mapping
+  if (!backend.vessel || !backend.vessel.recommended_class) {
+    throw new Error('Backend response is missing required vessel recommendation data (recommended_class).');
+  }
+
+  const vesselData = backend.vessel;
+  const recommendedClass = vesselData.recommended_class as VesselClass;
   const operationalMode = vesselData.operational_mode;
-  const comparisons = Array.isArray(vesselData.comparison)
-    ? vesselData.comparison
-    : [];
+  const isSingleVesselInfeasible =
+    recommendedClass === 'No Single-Vessel Fit' ||
+    operationalMode === 'INFEASIBLE' ||
+    String(backend.recommendation?.action || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(backend.recommendation?.headline || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(backend.chartering_window?.decision_action || '').toUpperCase() === 'INFEASIBLE' ||
+    String(backend.chartering_window?.recommended_action || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(backend.chartering_window?.recommended_action || '').toUpperCase().includes('INFEASIBLE');
+
+  const comparisons = Array.isArray(vesselData.comparison) ? vesselData.comparison : [];
 
   const vessels: VesselSuitability[] = comparisons.map(
     (v: {
@@ -204,6 +243,7 @@ export async function analyzeCharteringRequirement(
       status?: string;
     }) => {
       const isRec =
+        !isSingleVesselInfeasible &&
         v.vessel_type?.toLowerCase() === recommendedClass.toLowerCase();
 
       let cargoFit: SuitabilityStatus = 'Not Suitable';
@@ -222,8 +262,9 @@ export async function analyzeCharteringRequirement(
       } else if (
         v.port_feasible ||
         v.port_fit?.toLowerCase() === 'pass' ||
-        v.operational_mode?.includes('Transshipment') ||
-        v.operational_mode?.includes('Lighterage')
+        v.operational_mode?.toLowerCase().includes('alternative') ||
+        v.operational_mode?.toLowerCase().includes('transshipment') ||
+        v.operational_mode?.toLowerCase().includes('lighterage')
       ) {
         portFit = 'Suitable';
       }
@@ -250,13 +291,10 @@ export async function analyzeCharteringRequirement(
   );
 
   const vesselReason =
-    operationalMode && operationalMode !== 'Direct Port Call'
-      ? `${recommendedClass} (${operationalMode}): ${
-          vesselData.recommendation_reason ||
-          `Optimal fit for ${input.cargoQuantityMT.toLocaleString()} MT on the ${input.origin} → ${input.destination} route`
-        }`
-      : vesselData.recommendation_reason ||
-        `Best fit for ${input.cargoQuantityMT.toLocaleString()} MT on the ${input.origin} → ${input.destination} route`;
+    vesselData.recommendation_reason ||
+    (operationalMode && operationalMode !== 'DIRECT_PORT_CALL'
+      ? `${recommendedClass} (${operationalMode})`
+      : `${recommendedClass}`);
 
   const vesselRecommendation: VesselRecommendation = {
     recommended: recommendedClass,
@@ -265,24 +303,19 @@ export async function analyzeCharteringRequirement(
     operationalMode,
   };
 
-  // 3. Chartering Window
-  const cw = backend.chartering_window ?? {};
-  const isSingleVesselInfeasible =
-    recommendedClass === 'No Single-Vessel Fit' ||
-    operationalMode === 'INFEASIBLE' ||
-    String(backend.recommendation?.action || '').toUpperCase().includes('NO FEASIBLE') ||
-    String(backend.recommendation?.headline || '').toUpperCase().includes('NO FEASIBLE') ||
-    String(cw.decision_action || '').toUpperCase() === 'INFEASIBLE' ||
-    String(cw.recommended_action || '').toUpperCase().includes('NO FEASIBLE') ||
-    String(cw.recommended_action || '').toUpperCase().includes('INFEASIBLE');
+  // 3. Chartering Window validation & mapping
+  if (!backend.chartering_window) {
+    throw new Error('Backend response is missing required chartering_window evaluation.');
+  }
 
+  const cw = backend.chartering_window;
   const cwActionRaw = String(cw.recommended_action || '').toUpperCase();
   let cwAction: TimingAction = 'CHARTER_WITHIN_RANGE';
   if (isSingleVesselInfeasible || cw.decision_action === 'INFEASIBLE') {
     cwAction = 'INFEASIBLE';
-  } else if (cwActionRaw.includes('WAIT')) {
+  } else if (cw.decision_action === 'WAIT' || cwActionRaw.includes('WAIT')) {
     cwAction = 'WAIT';
-  } else if (cwActionRaw.includes('BOOK')) {
+  } else if (cw.decision_action === 'BOOK NOW' || cwActionRaw.includes('BOOK')) {
     cwAction = 'BOOK_NOW';
   }
 
@@ -312,9 +345,8 @@ export async function analyzeCharteringRequirement(
   const cwExplanation = isSingleVesselInfeasible
     ? (cw.explanation ||
        'Single-vessel chartering is infeasible for the selected cargo and port constraints.')
-    : `Strategy Score: ${cw.strategy_score ?? 100}/100 | Risk: ${
-        cw.risk ?? 'LOW'
-      } | Window: ${cw.selected_window ?? ''} (${cw.start ?? ''} to ${cw.end ?? ''}).`;
+    : (cw.explanation ||
+       `Strategy Score: ${cw.strategy_score}/100 | Risk: ${cw.risk} | Window: ${cw.selected_window} (${cw.start} to ${cw.end}).`);
 
   const charteringWindow: CharteringWindowResult = {
     action: cwAction,
@@ -327,20 +359,19 @@ export async function analyzeCharteringRequirement(
     risk: isSingleVesselInfeasible ? 'HIGH' : cw.risk,
   };
 
-  // 4. Recommendation
-  const rec = backend.recommendation ?? {};
+  // 4. Recommendation validation & mapping
+  if (!backend.recommendation) {
+    throw new Error('Backend response is missing required recommendation payload.');
+  }
+
+  const rec = backend.recommendation;
   const recActionRaw = String(rec.action || '').toUpperCase();
   let verdict: RecommendationVerdict = 'CONSIDER_ALTERNATIVE_WINDOW';
-  if (
-    recActionRaw.includes('NO FEASIBLE') ||
-    recActionRaw.includes('INFEASIBLE') ||
-    vesselData.operational_mode === 'INFEASIBLE' ||
-    recommendedClass === 'No Single-Vessel Fit'
-  ) {
+  if (isSingleVesselInfeasible) {
     verdict = 'NO_FEASIBLE_SINGLE_VESSEL';
-  } else if (recActionRaw.includes('WAIT')) {
+  } else if (cwAction === 'WAIT' || recActionRaw.includes('WAIT')) {
     verdict = 'WAIT';
-  } else if (recActionRaw.includes('BOOK')) {
+  } else if (cwAction === 'BOOK_NOW' || recActionRaw.includes('BOOK')) {
     verdict = 'BOOK_NOW';
   }
 

@@ -45,8 +45,21 @@ function ConfidenceBadge({ level }: { level: string }) {
   );
 }
 
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      date: string;
+      historical: number | null;
+      forecast: number | null;
+      isForecast: boolean;
+    };
+  }>;
+  label?: string;
+}
+
 // Custom tooltip
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   const item = payload[0]?.payload;
   if (!item) return null;

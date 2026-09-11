@@ -954,16 +954,20 @@ def evaluate_chartering_window(
             risk = "LOW"
             strategy_score = 100 if duration_months <= 1 else 95
 
+    start_disp = start_month if not is_seven_days else (timeline[0]["date"] if timeline else "2026-09")
+    explanation = f"Strategy Score: {strategy_score}/100 | Risk: {risk} | Window: {window_name} ({start_disp} to {end_month})."
+
     return {
         "selected_window": window_name,
         "duration_months": horizon_count,
         "duration_class": duration_class,
-        "start": start_month if not is_seven_days else timeline[0]["date"] if timeline else "2026-09",
+        "start": start_disp,
         "end": end_month,
         "strategy_score": strategy_score,
         "risk": risk,
         "recommended_action": action,
         "decision_action": decision_action,
+        "explanation": explanation,
         "min_forecast_rate": min_rate,
         "min_forecast_date": min_date,
         "min_forecast_month": min_month_str,

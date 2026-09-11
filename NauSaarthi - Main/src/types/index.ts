@@ -36,6 +36,7 @@ export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export interface FreightDataPoint {
   date: string;
+  rawDate?: string;
   rate: number;
   type: 'historical' | 'forecast';
 }
