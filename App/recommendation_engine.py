@@ -949,9 +949,9 @@ def get_sail_recommendation(
             # BOOK NOW
             rec_action = "BOOK NOW"
             if is_alt:
-                action_headline = f"CONTRACT NOW - {rec_vessel.upper()} + ALTERNATIVE DISCHARGE"
+                action_headline = f"BOOK NOW - {rec_vessel.upper()} + ALTERNATIVE DISCHARGE"
             else:
-                action_headline = f"CONTRACT NOW - {rec_vessel.upper()}"
+                action_headline = f"BOOK NOW - {rec_vessel.upper()}"
 
             if max_delta_pct >= 1.5:
                 timing_reason = (
