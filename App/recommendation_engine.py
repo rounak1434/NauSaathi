@@ -1060,6 +1060,16 @@ def get_sail_recommendation(
             f"Operational Strategy: Split cargo into multiple voyages (e.g. {math.ceil(cargo_tonnes / 35000)} x Handysize shipments) or arrange offshore lighterage / transshipment at deepwater anchorage.",
             "Decision support advisory only — commercial freight fixtures and charterparty terms remain subject to final negotiations.",
         ]
+        # Priority Rule: Physical feasibility takes priority over chartering timing.
+        # When no single-vessel option is physically feasible, do not recommend BOOK NOW or WAIT UNTIL.
+        window_eval = {
+            **window_eval,
+            "decision_action": "INFEASIBLE",
+            "recommended_action": "NO FEASIBLE CHARTERING WINDOW (Single-vessel chartering is infeasible for the selected cargo and port constraints)",
+            "strategy_score": 0,
+            "risk": "HIGH",
+            "explanation": "Single-vessel chartering is infeasible for the selected cargo and port constraints.",
+        }
     else:
         v_spec = VESSEL_REGISTRY.get(_normalize(rec_vessel), VESSEL_REGISTRY["panamax"])
         port_ok = dest_prof.max_draft_m >= v_spec.draft_m

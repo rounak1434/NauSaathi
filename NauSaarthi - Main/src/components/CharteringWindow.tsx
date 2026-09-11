@@ -1,4 +1,4 @@
-import { Clock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Clock, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { CharteringWindowResult } from '../types';
 
 interface Props {
@@ -46,7 +46,9 @@ export default function CharteringWindowCard({ data }: Props) {
                 : 'bg-[#1e3a5f]'
           } flex items-center justify-center flex-shrink-0 shadow-sm`}
         >
-          {isBookNow ? (
+          {isInfeasible ? (
+            <AlertTriangle className="w-6 h-6 text-white" />
+          ) : isBookNow ? (
             <CheckCircle2 className="w-6 h-6 text-white" />
           ) : (
             <Clock className="w-6 h-6 text-white" />
@@ -78,26 +80,30 @@ export default function CharteringWindowCard({ data }: Props) {
           {/* Track */}
           <div className="h-2 bg-gray-100 rounded-full relative overflow-visible">
             {/* Ideal window highlight */}
-            <div
-              className={`absolute top-0 h-full ${
-                isBookNow ? 'bg-emerald-500/20' : 'bg-[#1e3a5f]/15'
-              } rounded-full`}
-              style={{
-                left: `${idealStartPct}%`,
-                width: `${idealEndPct - idealStartPct}%`,
-              }}
-            />
-            {/* Ideal window strong bar */}
-            <div
-              className={`absolute top-0 h-full ${
-                isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
-              } rounded-full`}
-              style={{
-                left: `${idealStartPct}%`,
-                width: `${idealEndPct - idealStartPct}%`,
-                opacity: 0.6,
-              }}
-            />
+            {!isInfeasible && (
+              <>
+                <div
+                  className={`absolute top-0 h-full ${
+                    isBookNow ? 'bg-emerald-500/20' : 'bg-[#1e3a5f]/15'
+                  } rounded-full`}
+                  style={{
+                    left: `${idealStartPct}%`,
+                    width: `${idealEndPct - idealStartPct}%`,
+                  }}
+                />
+                {/* Ideal window strong bar */}
+                <div
+                  className={`absolute top-0 h-full ${
+                    isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
+                  } rounded-full`}
+                  style={{
+                    left: `${idealStartPct}%`,
+                    width: `${idealEndPct - idealStartPct}%`,
+                    opacity: 0.6,
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* Markers */}
@@ -106,7 +112,11 @@ export default function CharteringWindowCard({ data }: Props) {
             <div className="flex flex-col items-start" style={{ marginLeft: `${todayPct}%` }}>
               <div
                 className={`w-2.5 h-2.5 rounded-full ${
-                  isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
+                  isInfeasible
+                    ? 'bg-amber-600'
+                    : isBookNow
+                      ? 'bg-emerald-600'
+                      : 'bg-[#1e3a5f]'
                 } border-2 border-white shadow-sm -mt-[22px]`}
               />
               <span className="text-[11px] font-medium text-gray-500 mt-1">Today</span>
@@ -115,16 +125,25 @@ export default function CharteringWindowCard({ data }: Props) {
             {/* Ideal Window label */}
             <div
               className="flex flex-col items-center absolute"
-              style={{ left: `${(idealStartPct + idealEndPct) / 2}%`, transform: 'translateX(-50%)' }}
+              style={{
+                left: isInfeasible ? '50%' : `${(idealStartPct + idealEndPct) / 2}%`,
+                transform: 'translateX(-50%)',
+              }}
             >
               <span
                 className={`text-[11px] font-semibold ${
-                  isBookNow ? 'text-emerald-700' : 'text-[#1e3a5f]'
+                  isInfeasible
+                    ? 'text-amber-800'
+                    : isBookNow
+                      ? 'text-emerald-700'
+                      : 'text-[#1e3a5f]'
                 } mt-1`}
               >
-                {data.idealWindowStart !== undefined && data.idealWindowEnd !== undefined
-                  ? `Day ${data.idealWindowStart}–${data.idealWindowEnd}`
-                  : `~${data.timelineDays} days`}
+                {isInfeasible
+                  ? 'No Feasible Window'
+                  : data.idealWindowStart !== undefined && data.idealWindowEnd !== undefined
+                    ? `Day ${data.idealWindowStart}–${data.idealWindowEnd}`
+                    : `~${data.timelineDays} days`}
               </span>
             </div>
           </div>
@@ -142,12 +161,14 @@ export default function CharteringWindowCard({ data }: Props) {
           <ArrowRight className="w-3.5 h-3.5 text-gray-300" />
           <span
             className={`${
-              isBookNow
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-[#eef2ff] border-[#d4dff7] text-[#1e3a5f]'
+              isInfeasible
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                : isBookNow
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-[#eef2ff] border-[#d4dff7] text-[#1e3a5f]'
             } border rounded-md px-3 py-1.5 font-semibold`}
           >
-            Ideal Window
+            {isInfeasible ? 'Infeasible' : 'Ideal Window'}
           </span>
         </div>
       </div>

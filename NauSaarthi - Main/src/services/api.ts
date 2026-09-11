@@ -267,18 +267,32 @@ export async function analyzeCharteringRequirement(
 
   // 3. Chartering Window
   const cw = backend.chartering_window ?? {};
+  const isSingleVesselInfeasible =
+    recommendedClass === 'No Single-Vessel Fit' ||
+    operationalMode === 'INFEASIBLE' ||
+    String(backend.recommendation?.action || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(backend.recommendation?.headline || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(cw.decision_action || '').toUpperCase() === 'INFEASIBLE' ||
+    String(cw.recommended_action || '').toUpperCase().includes('NO FEASIBLE') ||
+    String(cw.recommended_action || '').toUpperCase().includes('INFEASIBLE');
+
   const cwActionRaw = String(cw.recommended_action || '').toUpperCase();
   let cwAction: TimingAction = 'CHARTER_WITHIN_RANGE';
-  if (cwActionRaw.includes('WAIT')) {
+  if (isSingleVesselInfeasible || cw.decision_action === 'INFEASIBLE') {
+    cwAction = 'INFEASIBLE';
+  } else if (cwActionRaw.includes('WAIT')) {
     cwAction = 'WAIT';
   } else if (cwActionRaw.includes('BOOK')) {
     cwAction = 'BOOK_NOW';
   }
 
   const totalDays = isSevenDays ? 7 : (cw.duration_months || durationMonths) * 30;
-  let idealStart = 0;
-  let idealEnd = totalDays;
-  if (isSevenDays) {
+  let idealStart: number | undefined = 0;
+  let idealEnd: number | undefined = totalDays;
+  if (isSingleVesselInfeasible) {
+    idealStart = undefined;
+    idealEnd = undefined;
+  } else if (isSevenDays) {
     idealStart = 0;
     idealEnd = 7;
   } else if (cwAction === 'WAIT') {
@@ -289,13 +303,18 @@ export async function analyzeCharteringRequirement(
     idealEnd = Math.min(14, totalDays);
   }
 
-  const actionHeadline = cw.recommended_action
-    ? cw.recommended_action.split('(')[0].trim()
-    : (cw.selected_window || 'Charter Window');
+  const actionHeadline = isSingleVesselInfeasible
+    ? 'NO FEASIBLE CHARTERING WINDOW'
+    : cw.recommended_action
+      ? cw.recommended_action.split('(')[0].trim()
+      : (cw.selected_window || 'Charter Window');
 
-  const cwExplanation = `Strategy Score: ${cw.strategy_score ?? 100}/100 | Risk: ${
-    cw.risk ?? 'LOW'
-  } | Window: ${cw.selected_window ?? ''} (${cw.start ?? ''} to ${cw.end ?? ''}).`;
+  const cwExplanation = isSingleVesselInfeasible
+    ? (cw.explanation ||
+       'Single-vessel chartering is infeasible for the selected cargo and port constraints.')
+    : `Strategy Score: ${cw.strategy_score ?? 100}/100 | Risk: ${
+        cw.risk ?? 'LOW'
+      } | Window: ${cw.selected_window ?? ''} (${cw.start ?? ''} to ${cw.end ?? ''}).`;
 
   const charteringWindow: CharteringWindowResult = {
     action: cwAction,
@@ -304,8 +323,8 @@ export async function analyzeCharteringRequirement(
     timelineDays: totalDays,
     idealWindowStart: idealStart,
     idealWindowEnd: idealEnd,
-    strategyScore: cw.strategy_score,
-    risk: cw.risk,
+    strategyScore: isSingleVesselInfeasible ? undefined : cw.strategy_score,
+    risk: isSingleVesselInfeasible ? 'HIGH' : cw.risk,
   };
 
   // 4. Recommendation
