@@ -87,8 +87,8 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://127.0.0.1:5501",
     "http://127.0.0.1:8080",
-    # Add production URLs below when deploying:
-    # "https://sail-frontend.example.com",
+    # Production deployed frontend:
+    "https://nau-saathi-silk.vercel.app",
 ]
 
 
