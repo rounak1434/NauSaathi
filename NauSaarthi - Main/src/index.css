@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ─── Base ────────────────────────────────────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8f9fb;
+  color: #1e293b;
+  line-height: 1.6;
+}
+
+/* ─── Scrollbar (subtle) ──────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* ─── Loading animation ──────────────────────────────────────────────── */
+
+@keyframes pulse-bar {
+  0%, 100% { transform: scaleY(0.4); opacity: 0.4; }
+  50%      { transform: scaleY(1);   opacity: 1;   }
+}
+
+.loading-bar {
+  display: inline-block;
+  width: 3px;
+  height: 18px;
+  margin: 0 2px;
+  background-color: #1e3a5f;
+  border-radius: 2px;
+  animation: pulse-bar 1.2s ease-in-out infinite;
+}
+.loading-bar:nth-child(2) { animation-delay: 0.15s; }
+.loading-bar:nth-child(3) { animation-delay: 0.3s; }
+.loading-bar:nth-child(4) { animation-delay: 0.45s; }
+.loading-bar:nth-child(5) { animation-delay: 0.6s; }
+
+/* ─── Fade-in utility ─────────────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.animate-fade-in-delay-1 { animation-delay: 0.08s; }
+.animate-fade-in-delay-2 { animation-delay: 0.16s; }
+.animate-fade-in-delay-3 { animation-delay: 0.24s; }
+.animate-fade-in-delay-4 { animation-delay: 0.32s; }
+
+/* ─── Chart tooltip ───────────────────────────────────────────────────── */
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+/* ─── Dropdown ────────────────────────────────────────────────────────── */
+
+.dropdown-menu {
+  position: absolute;
+  z-index: 50;
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-top: 4px;
+}
+
+.dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: #f1f5f9;
+}
+
+.dropdown-item.selected {
+  background: #eef2ff;
+  font-weight: 600;
+  color: #1e3a5f;
+}

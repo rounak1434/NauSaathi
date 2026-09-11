@@ -1,0 +1,9 @@
+Scenario,Average_BreakEven_USD_per_mt,Minimum_BreakEven_USD_per_mt,Maximum_BreakEven_USD_per_mt,Months_Calculated,Interpretation
+BASE,8.228335824132555,6.909223952606835,13.562676549283367,11,Higher value means greater freight coverage required under this stress scenario.
+BUNKER +10%,9.051169406545812,7.600146347867519,14.918944204211703,11,Higher value means greater freight coverage required under this stress scenario.
+BUNKER +20%,9.874002988959065,8.2910687431282,16.27521185914004,11,Higher value means greater freight coverage required under this stress scenario.
+DISTANCE +10%,9.05116940654581,7.6001463478675175,14.918944204211703,11,Higher value means greater freight coverage required under this stress scenario.
+DISTANCE +20%,9.874002988959067,8.291068743128202,16.27521185914004,11,Higher value means greater freight coverage required under this stress scenario.
+FUEL +10%,9.05116940654581,7.6001463478675175,14.918944204211703,11,Higher value means greater freight coverage required under this stress scenario.
+FUEL +20%,9.874002988959067,8.291068743128202,16.27521185914004,11,Higher value means greater freight coverage required under this stress scenario.
+COMBINED ADVERSE,14.218564304101053,11.93913899010461,23.436305077161656,11,Higher value means greater freight coverage required under this stress scenario.

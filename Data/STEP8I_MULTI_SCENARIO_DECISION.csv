@@ -1,0 +1,3 @@
+Scenario_ID,Origin,Destination,Cargo_Type,Vessel_Type,Cargo_tonnes,Port_Feasible,Average_BreakEven_USD_per_mt,Average_Bunker_Cost_USD,Average_Voyage_Days,Commercial_Rate_Available,Final_Profit_Available,Decision_State,Operational_Score,Vessel_Recommendation,Data_Quality
+GLADSTONE_DHAMRA_COAL,"Gladstone, Australia","Dhamra, India",Coal,Panamax,80000,True,8.228335824132555,625353.5226340742,36.828466710758384,False,False,PARTIAL DECISION SUPPORT,100.0,PRIMARY CANDIDATE,MIXED: PROJECT + EXTERNAL + SCENARIO
+GLADSTONE_DHAMRA_COAL,"Gladstone, Australia","Dhamra, India",Coal,Capesize,150000,False,,,,False,False,BENCHMARK SCREENING ONLY,0.0,NOT CURRENTLY RECOMMENDED,MIXED: PROJECT + EXTERNAL + SCENARIO

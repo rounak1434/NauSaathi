@@ -1,0 +1,3 @@
+Vessel_Type,Port_Feasible,Operational_Score,Recommendation,Reason
+Panamax,True,100.0,PRIMARY SCENARIO CANDIDATE,Benchmark passes configured Dhamra LOA/beam/draft screen.
+Capesize,False,,VESSEL-SPECIFIC VERIFICATION REQUIRED,Selected BCI182 benchmark fails the configured Dhamra draft screen. This does not reject all Capesize vessels.

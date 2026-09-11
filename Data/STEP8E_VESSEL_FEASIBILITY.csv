@@ -1,0 +1,3 @@
+Vessel_Type,DWT_tonnes,LOA_m,Beam_m,Draft_m,LOA_Check,Beam_Check,Draft_Check,Dhamra_Feasible
+Capesize,182000,292,45.0,18.2,True,True,False,False
+Panamax,82500,229,32.25,14.43,True,True,True,True

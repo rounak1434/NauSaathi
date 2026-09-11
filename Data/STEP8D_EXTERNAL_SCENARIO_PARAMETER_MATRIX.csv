@@ -1,0 +1,3 @@
+Vessel_Type,Route,Cargo_tonnes,DWT_tonnes,LOA_m,Beam_m,Laden_Speed_knots,Ballast_Speed_knots,Laden_Fuel_tpd,Ballast_Fuel_tpd,Loading_Turn_Hours,Discharge_Turn_Hours,Commission_Percent,Laden_Distance_nm,Ballast_Distance_nm,Port_Days,Port_Cost_USD,Other_Voyage_Cost_USD,Bunker_Price_Status,Revenue_Basis,Overall_Status,Dhamra_LOA_Beam_Check
+Capesize,Gladstone -> Dhamra,150000,182000,292,45.0,14.0,15,52,44,12,24,5,,,1.5,,,PROJECT DATA,Baltic C18 $/mt,PARTIALLY READY,PASS
+Panamax,Gladstone -> Dhamra,80000,82500,229,32.25,13.5,14,33,31,12,24,5,,,1.5,,,PROJECT DATA,Baltic P9 $/mt,PARTIALLY READY,PASS

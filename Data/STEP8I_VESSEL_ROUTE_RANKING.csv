@@ -1,0 +1,3 @@
+Scenario_ID,Origin,Destination,Vessel_Type,Cargo_tonnes,Port_Feasible,Operational_Score,Vessel_Recommendation
+GLADSTONE_DHAMRA_COAL,"Gladstone, Australia","Dhamra, India",Panamax,80000,True,100.0,PRIMARY CANDIDATE
+GLADSTONE_DHAMRA_COAL,"Gladstone, Australia","Dhamra, India",Capesize,150000,False,0.0,NOT CURRENTLY RECOMMENDED
