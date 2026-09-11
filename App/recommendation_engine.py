@@ -342,38 +342,60 @@ def build_forecast_timeline(
             "data_status": pt_status,
         })
 
-    # Expected Rate: Target horizon according to contract_duration_months
-    # 1 -> Oct 2026 (Month +1, Within 30 Days)
-    # 2 -> Nov 2026 (Month +2, Within 60 Days)
-    # 3 -> Dec 2026 (Month +3, Within 90 Days)
-    horizon_idx = min(max(1, contract_duration_months), len(points) - 1)
-    target_point = points[horizon_idx]
-    expected_rate = target_point["estimated_freight_usd_pmt"]
-    expected_date = target_point["date"]
-    expected_status = target_point.get("data_status", "FORECAST")
-    expected_horizon_label = f"Month +{horizon_idx} ({expected_date})"
+    # Target execution horizon according to contract_duration_months:
+    # 1 -> Within 30 Days (Month 1: 2026-10)
+    # 2 -> Within 60 Days (Months 1..2: 2026-10..2026-11)
+    # 3 -> Within 90 Days (Months 1..3: 2026-10..2026-12)
+    horizon_count = min(max(1, contract_duration_months), len(points) - 1)
+    horizon_points = points[1:1 + horizon_count]
 
-    # Best Month: Point with lowest projected freight rate among forward forecast points
-    forward_pts = points[1:]
-    best_point = min(forward_pts, key=lambda p: p["estimated_freight_usd_pmt"])
-    best_date = best_point["date"]
+    # Evaluate points inside the selected horizon
+    min_point = min(horizon_points, key=lambda p: p["estimated_freight_usd_pmt"])
+    max_point = max(horizon_points, key=lambda p: p["estimated_freight_usd_pmt"])
+    min_rate = min_point["estimated_freight_usd_pmt"]
+    max_rate = max_point["estimated_freight_usd_pmt"]
+    min_date = min_point["date"]
+    max_date = max_point["date"]
 
+    min_delta_pct = ((min_rate - cur_mkt_rate) / cur_mkt_rate) * 100.0 if cur_mkt_rate > 0 else 0.0
+    max_delta_pct = ((max_rate - cur_mkt_rate) / cur_mkt_rate) * 100.0 if cur_mkt_rate > 0 else 0.0
+
+    import calendar
     try:
-        b_year, b_m = best_date.split("-")
-        import calendar
-        b_name = f"{calendar.month_abbr[int(b_m)]} {b_year}"
-        b_q = f"Q{(int(b_m) - 1) // 3 + 1}"
+        b_year, b_m = min_date.split("-")
+        b_name = f"{calendar.month_abbr[int(b_m)].upper()} {b_year}"
     except Exception:
-        b_name = best_date
-        b_q = "Q1"
+        b_name = min_date
 
-    # Market Trend determination
-    if expected_rate < cur_mkt_rate * 0.985:
-        market_trend = f"Declining / Favorable Entry ({b_q} Low Rate Window)"
-    elif expected_rate > cur_mkt_rate * 1.015:
+    # Align Expected Rate and Market Trend with the window's forecast curve
+    if min_delta_pct <= -3.5:
+        # Meaningful decline within selected horizon
+        expected_rate = min_rate
+        expected_date = min_date
+        expected_status = min_point.get("data_status", "FORECAST")
+        expected_horizon_label = f"Lowest Point in Window ({expected_date})"
+        market_trend = f"Declining / Favorable Entry ({b_name} Low Rate Window)"
+        best_date = min_date
+        best_signal = f"Favorable Entry ({b_name} Low Freight)"
+    elif max_delta_pct >= 1.5:
+        # Material rise within selected horizon
+        expected_rate = max_rate
+        expected_date = max_date
+        expected_status = max_point.get("data_status", "FORECAST")
+        expected_horizon_label = f"Peak Exposure in Window ({expected_date})"
         market_trend = "Rising Freight Rates"
+        best_date = min_date
+        best_signal = f"Rising Rates (Prompt Lock-in Advised)"
     else:
+        # Stable / minor movement within selected horizon
+        target_point = points[horizon_count]
+        expected_rate = target_point["estimated_freight_usd_pmt"]
+        expected_date = target_point["date"]
+        expected_status = target_point.get("data_status", "FORECAST")
+        expected_horizon_label = f"Month +{horizon_count} ({expected_date})"
         market_trend = "Stable Market Rate"
+        best_date = min_point["date"]
+        best_signal = f"Stable Market ({b_name})"
 
     summary = {
         "current_rate": cur_mkt_rate,
@@ -387,7 +409,7 @@ def build_forecast_timeline(
         "market_trend": market_trend,
         "confidence": "High (Random Forest ML Validation R²=0.88)" if expected_status == "FORECAST" else "Medium (Derived Model Estimate)",
         "best_month": best_date,
-        "best_month_signal": f"Favorable Entry ({b_name} Low Freight)",
+        "best_month_signal": best_signal,
         "route_benchmark": baltic_benchmark,
     }
 
@@ -683,132 +705,133 @@ def calculate_route_economics(
 def evaluate_chartering_window(
     duration_months: int,
     current_rate: float,
-    expected_rate: float,
-    market_trend: str,
-    best_month: str = "2027-08",
+    expected_rate: float = None,
+    market_trend: str = "Stable Market Rate",
+    best_month: str = None,
     start_month: str = "2026-10",
+    timeline: list[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """
-    Evaluates the chartering window strategy score and action based on:
-      1. Requested execution horizon (duration_months)
-      2. Freight rate delta (expected_rate vs current_rate)
-      3. Forward rate momentum (market_trend)
+    Evaluates the chartering window strategy score and action based strictly on
+    the forecast points inside the user's SELECTED chartering horizon:
+      - Within 30 Days (duration_months <= 1): next 1 forecast month
+      - Within 60 Days (duration_months == 2): next 2 forecast months
+      - Within 90 Days (duration_months >= 3): next 3 forecast months
 
-    Decision thresholds (calibrated for dry-bulk commercial practice):
-      - Prompt (<=1 month): rate_delta_pct < -3.5% => WAIT ~14 Days;
-                            rate_delta_pct > +1.5% => BOOK NOW (rising urgency);
-                            otherwise               => BOOK NOW (stable window).
-      - Medium (2 months):  Score/risk adjusts to rate direction.
-      - Quarterly (3 months): FORWARD POSITIONING with contextual best-month reference.
+    Explicit, deterministic decision rules:
+      A. WAIT:
+         If minimum forecast in horizon <= current_rate * (1 - 0.035)  [delta <= -3.5%]
+         => WAIT UNTIL <minimum forecast month> (Forecast freight is X.X% below current rate)
+      B. BOOK NOW:
+         If maximum forecast in horizon >= current_rate * (1 + 0.015)  [delta >= +1.5%]
+         => BOOK NOW (Forecast rising X.X% within selected window)
+      C. STABLE / MINOR MOVEMENT:
+         Neither meaningful decline nor meaningful rise exists
+         => BOOK NOW (Forecast is broadly stable within the selected window)
     """
-    # Rate movement calculation
-    rate_delta_pct = (
-        ((expected_rate - current_rate) / current_rate) * 100.0
-        if current_rate > 0
-        else 0.0
-    )
+    import calendar
 
-    try:
-        b_year, b_m = best_month.split("-")
-        import calendar
-        b_name = f"{calendar.month_abbr[int(b_m)]} {b_year}"
-    except Exception:
-        b_name = best_month
+    # Window name & duration class
+    if duration_months <= 1:
+        window_name = "Within 30 Days" if duration_months == 1 else "Within 7 Days"
+        duration_class = "SHORT-TERM / PROMPT SPOT"
+        horizon_count = 1
+    elif duration_months == 2:
+        window_name = "Within 60 Days"
+        duration_class = "MEDIUM-TERM FORWARD"
+        horizon_count = 2
+    else:
+        window_name = "Within 90 Days"
+        duration_class = "QUARTERLY TIME-CHARTER"
+        horizon_count = 3
 
     # End month calculation
     try:
         s_y, s_m = map(int, start_month.split("-"))
-        e_m = (s_m - 1 + (duration_months - 1)) % 12 + 1
-        e_y = s_y + (s_m - 1 + (duration_months - 1)) // 12
+        e_m = (s_m - 1 + (horizon_count - 1)) % 12 + 1
+        e_y = s_y + (s_m - 1 + (horizon_count - 1)) // 12
         end_month = f"{e_y:04d}-{e_m:02d}"
     except Exception:
         end_month = start_month
 
-    if duration_months <= 1:
-        window_name = "Within 30 Days" if duration_months == 1 else "Within 7 Days"
-
-        # Substantial forward price decline (> 3.5% drop in prompt horizon):
-        # Commercial advice: Defer prompt fixtures to capture easing freight.
-        if rate_delta_pct < -3.5:
-            strategy_score = 75
-            risk = "MODERATE"
-            action = (
-                f"WAIT ~14 Days (Rates softening by "
-                f"{abs(rate_delta_pct):.1f}%; monitor for market dip)"
-            )
-        # Rising rate environment (> +1.5% increase):
-        # Commercial advice: Book immediately to hedge against freight inflation.
-        elif rate_delta_pct > 1.5:
-            strategy_score = 95
-            risk = "LOW"
-            action = "BOOK NOW (Rising freight curve; secure prompt vessel tonnage)"
-        # Stable rate environment (within deadband, or minor softening up to -3.5%):
-        # Commercial advice: Rates predictable; execute prompt spot booking.
-        else:
-            strategy_score = 100
-            risk = "LOW"
-            action = "BOOK NOW (Stable freight rates; favorable prompt booking window)"
-
-        return {
-            "selected_window": window_name,
-            "duration_months": 1,
-            "duration_class": "SHORT-TERM / PROMPT SPOT",
-            "start": start_month,
-            "end": end_month,
-            "strategy_score": strategy_score,
-            "risk": risk,
-            "recommended_action": action,
-            "provenance": DataProvenance.VERIFIED,
-        }
-    elif duration_months == 2:
-        # Medium-term: score and risk adjust to rate direction
-        if rate_delta_pct <= -1.5:
-            strategy_score = 90
-            risk = "LOW"
-            action = f"MONITOR & NEGOTIATE (Rates easing; target favorable entry by {b_name})"
-        elif rate_delta_pct > 1.5:
-            strategy_score = 80
-            risk = "MODERATE"
-            action = f"MONITOR & NEGOTIATE (Rates rising; negotiate prompt lock-in before {b_name})"
-        else:
-            strategy_score = 92
-            risk = "LOW"
-            action = f"MONITOR & NEGOTIATE (Stable outlook; target {b_name} entry point)"
-
-        return {
-            "selected_window": "Within 60 Days",
-            "duration_months": 2,
-            "duration_class": "MEDIUM-TERM FORWARD",
-            "start": start_month,
-            "end": end_month,
-            "strategy_score": strategy_score,
-            "risk": risk,
-            "recommended_action": action,
-            "provenance": DataProvenance.DERIVED,
-        }
+    # Extract all forecast points strictly inside the selected horizon
+    if timeline and len(timeline) > 1:
+        forward_points = [p for p in timeline if p.get("is_forecast", False)]
+        if not forward_points:
+            forward_points = timeline[1:]
+        horizon_points = forward_points[:horizon_count]
+    elif expected_rate is not None:
+        horizon_points = [{"date": start_month, "estimated_freight_usd_pmt": expected_rate}]
     else:
-        # Quarterly: FORWARD POSITIONING with contextual best-month reference
-        if rate_delta_pct <= -1.5:
-            strategy_score = 90
-            risk = "LOW"
-        elif rate_delta_pct > 1.5:
-            strategy_score = 82
-            risk = "MODERATE"
-        else:
-            strategy_score = 88
-            risk = "MODERATE"
+        horizon_points = [{"date": start_month, "estimated_freight_usd_pmt": current_rate}]
 
-        return {
-            "selected_window": "Within 90 Days",
-            "duration_months": 3,
-            "duration_class": "QUARTERLY TIME-CHARTER",
-            "start": start_month,
-            "end": end_month,
-            "strategy_score": strategy_score,
-            "risk": risk,
-            "recommended_action": f"FORWARD POSITIONING (Lock in forward tonnage for {b_name})",
-            "provenance": DataProvenance.DERIVED,
-        }
+    if not horizon_points:
+        horizon_points = [{"date": start_month, "estimated_freight_usd_pmt": current_rate}]
+
+    # Identify min/max rates and dates inside selected horizon
+    min_pt = min(horizon_points, key=lambda p: p["estimated_freight_usd_pmt"])
+    max_pt = max(horizon_points, key=lambda p: p["estimated_freight_usd_pmt"])
+    min_rate = min_pt["estimated_freight_usd_pmt"]
+    max_rate = max_pt["estimated_freight_usd_pmt"]
+    min_date = min_pt["date"]
+    max_date = max_pt["date"]
+
+    min_delta_pct = ((min_rate - current_rate) / current_rate) * 100.0 if current_rate > 0 else 0.0
+    max_delta_pct = ((max_rate - current_rate) / current_rate) * 100.0 if current_rate > 0 else 0.0
+
+    try:
+        y_min, m_min = min_date.split("-")
+        min_month_str = f"{calendar.month_abbr[int(m_min)].upper()} {y_min}"
+    except Exception:
+        min_month_str = min_date
+
+    try:
+        y_max, m_max = max_date.split("-")
+        max_month_str = f"{calendar.month_abbr[int(m_max)].upper()} {y_max}"
+    except Exception:
+        max_month_str = max_date
+
+    # Deterministic Decision Rules:
+    # A. Meaningful forecast decline within selected horizon (>= 3.5% drop):
+    if min_rate <= current_rate * (1.0 - 0.035):
+        decision_action = "WAIT"
+        action = f"WAIT UNTIL {min_month_str} (Forecast freight is {abs(min_delta_pct):.1f}% below current rate)"
+        risk = "MODERATE"
+        strategy_score = min(95, round(75 + abs(min_delta_pct) * 2))
+    # B. Forecast rates rise materially within selected horizon (>= 1.5% rise):
+    elif max_rate >= current_rate * (1.0 + 0.015):
+        decision_action = "BOOK NOW"
+        action = f"BOOK NOW (Forecast rising {max_delta_pct:.1f}% within selected window)"
+        risk = "LOW"
+        strategy_score = 95
+    # C. Stable / minor movement (neither meaningful decline nor meaningful rise):
+    else:
+        decision_action = "BOOK NOW"
+        action = "BOOK NOW (Forecast is broadly stable within the selected window)"
+        risk = "LOW"
+        strategy_score = 100 if duration_months <= 1 else 95
+
+    return {
+        "selected_window": window_name,
+        "duration_months": horizon_count,
+        "duration_class": duration_class,
+        "start": start_month,
+        "end": end_month,
+        "strategy_score": strategy_score,
+        "risk": risk,
+        "recommended_action": action,
+        "decision_action": decision_action,
+        "min_forecast_rate": min_rate,
+        "min_forecast_date": min_date,
+        "min_forecast_month": min_month_str,
+        "min_delta_pct": round(min_delta_pct, 2),
+        "max_forecast_rate": max_rate,
+        "max_forecast_date": max_date,
+        "max_forecast_month": max_month_str,
+        "max_delta_pct": round(max_delta_pct, 2),
+        "horizon_points_count": len(horizon_points),
+        "provenance": DataProvenance.VERIFIED if duration_months <= 1 else DataProvenance.DERIVED,
+    }
 
 
 # ============================================================
@@ -823,7 +846,7 @@ def get_sail_recommendation(
     contract_duration_months: int = 1,
 ) -> dict[str, Any]:
     """
-    Primary API entry point for NauSaathi decision intelligence.
+    Primary API entry point for NauSaarthi decision intelligence.
     Returns complete structured analysis object with dynamic, date-aware forecast.
     """
     # 1. Look up profiles from registry
@@ -857,7 +880,7 @@ def get_sail_recommendation(
         cargo_tonnes=cargo_tonnes,
     )
 
-    # 5. Chartering Window Evaluation
+    # 5. Chartering Window Evaluation strictly driven by selected horizon
     start_month = timeline[1]["date"] if len(timeline) > 1 else "2026-10"
     window_eval = evaluate_chartering_window(
         duration_months=contract_duration_months,
@@ -866,14 +889,23 @@ def get_sail_recommendation(
         market_trend=forecast_summary["market_trend"],
         best_month=forecast_summary["best_month"],
         start_month=start_month,
+        timeline=timeline,
     )
 
-    # 6. Final Recommendation Formulation
+    # 6. Final Recommendation Formulation (aligned with chartering window action)
     rec_vessel = vessel_summary["recommended_class"]
     dest_name = dest_prof.name
-    
+    decision = window_eval["decision_action"]
+    min_month_str = window_eval["min_forecast_month"]
+    min_delta_pct = window_eval["min_delta_pct"]
+    max_delta_pct = window_eval["max_delta_pct"]
+    min_rate = window_eval["min_forecast_rate"]
+    max_rate = window_eval["max_forecast_rate"]
+    cur_rate = forecast_summary["current_rate"]
+
     if rec_vessel == "No Single-Vessel Fit":
         port_ok = False
+        rec_action = "NO FEASIBLE SINGLE-VESSEL OPTION"
         action_headline = "NO FEASIBLE SINGLE-VESSEL OPTION"
         reasons = [
             f"No single vessel in the 4 evaluated classes satisfies both the cargo payload requirement ({cargo_tonnes:,.0f} MT) and physical port limits at {dest_name} (max draft {dest_prof.max_draft_m}m, max LOA {dest_prof.max_loa_m}m).",
@@ -885,47 +917,76 @@ def get_sail_recommendation(
     else:
         v_spec = VESSEL_REGISTRY.get(_normalize(rec_vessel), VESSEL_REGISTRY["panamax"])
         port_ok = dest_prof.max_draft_m >= v_spec.draft_m
+        is_alt = (vessel_summary.get("operational_mode") == "ALTERNATIVE_DISCHARGE")
 
-        if vessel_summary.get("operational_mode") == "ALTERNATIVE_DISCHARGE":
-            action_headline = f"CONSIDER {rec_vessel.upper()} + ALTERNATIVE DISCHARGE"
+        if decision == "WAIT":
+            rec_action = "WAIT / DEFER"
+            if is_alt:
+                action_headline = f"WAIT / DEFER - TARGET {min_month_str} ({rec_vessel.upper()} + ALTERNATIVE DISCHARGE)"
+            else:
+                action_headline = f"WAIT / DEFER - TARGET {min_month_str} ({rec_vessel.upper()})"
+
             reasons = [
-                f"{rec_vessel} provides optimal single-voyage payload capacity for {cargo_tonnes:,.0f} MT ({v_spec.dwt_tonnes:,.0f} DWT).",
-                f"Direct {dest_name} berth access is draft-constrained (port max {dest_prof.max_draft_m}m vs {v_spec.draft_m}m vessel draft).",
-                f"Operational Strategy: Viable via offshore lighterage / deepwater transshipment (partial discharge at anchorage prior to berth entry).",
-                f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and LOW bunker volatility risk.",
-                "Commercial freight rate quotes and lighterage service agreements remain subject to charterparty terms.",
-                "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
+                f"Forecast freight curve indicates a {abs(min_delta_pct):.1f}% decline to ${min_rate:.2f}/MT in {min_month_str} (current rate: ${cur_rate:.2f}/MT); deferring contract fixture captures lower forward freight.",
             ]
-        elif port_ok and vessel_summary["cargo_fit"] == "Optimal":
-            action_headline = f"CONSIDER {rec_vessel.upper()} CONTRACTING"
-            reasons = [
-                f"{rec_vessel} passes all physical draft ({v_spec.draft_m}m) and berth restrictions at {dest_name} (max draft {dest_prof.max_draft_m}m).",
-                f"Cargo quantity ({cargo_tonnes:,.0f} MT) perfectly aligns with {rec_vessel} deadweight payload capacity.",
-                f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and LOW bunker volatility risk.",
-                "Commercial freight rate quotes and complete voyage-cost settlement remain required for final bottom-line profit calculation.",
-                "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
-            ]
-        elif port_ok and vessel_summary["cargo_fit"] == "Underutilized":
-            action_headline = f"CONSIDER {rec_vessel.upper()} WITH BUNDLED CARGO"
-            reasons = [
-                f"{rec_vessel} passes physical draft ({v_spec.draft_m}m) limits at {dest_name}, but requested parcel ({cargo_tonnes:,.0f} MT) is below optimal capacity.",
-                "Consider combining with additional regional parcels or co-loading to maximize deadweight utilization.",
-                f"Selected window ({window_eval['selected_window']}) provides strategy score of {window_eval['strategy_score']}/100.",
-                "Decision support advisory only — freight fixtures subject to broker terms.",
-            ]
-        elif not port_ok:
-            action_headline = f"RE-EVALUATE VESSEL / LIGHTERAGE REQUIRED AT {dest_name.upper()}"
-            reasons = [
-                f"{dest_name} maximum permissible draft ({dest_prof.max_draft_m}m) is restrictive for {rec_vessel} ({v_spec.draft_m}m draft).",
-                "Consider lighterage/transshipment at Sagar-Sandheads or shifting to Handysize/Supramax parcel sizing.",
-                "Operational risk is elevated due to tidal or river draft constraints.",
-            ]
+            if is_alt:
+                reasons.extend([
+                    f"{rec_vessel} provides optimal single-voyage payload capacity for {cargo_tonnes:,.0f} MT ({v_spec.dwt_tonnes:,.0f} DWT).",
+                    f"Direct {dest_name} berth access is draft-constrained (port max {dest_prof.max_draft_m}m vs {v_spec.draft_m}m vessel draft); viable via offshore lighterage / deepwater transshipment.",
+                    f"Selected window ({window_eval['selected_window']}) strategy score is {window_eval['strategy_score']}/100 with {window_eval['risk']} market risk.",
+                    "Commercial freight rate quotes and lighterage service agreements remain subject to charterparty terms.",
+                    "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
+                ])
+            else:
+                reasons.extend([
+                    f"{rec_vessel} passes all physical draft ({v_spec.draft_m}m) and berth restrictions at {dest_name} (max draft {dest_prof.max_draft_m}m).",
+                    f"Cargo quantity ({cargo_tonnes:,.0f} MT) perfectly aligns with {rec_vessel} deadweight payload capacity.",
+                    f"Selected window ({window_eval['selected_window']}) strategy score is {window_eval['strategy_score']}/100 with {window_eval['risk']} market risk.",
+                    "Commercial freight rate quotes and complete voyage-cost settlement remain required for final bottom-line profit calculation.",
+                    "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
+                ])
         else:
-            action_headline = f"MONITOR {rec_vessel.upper()} PARCEL SIZING"
-            reasons = [
-                f"Requested cargo tonnage ({cargo_tonnes:,.0f} MT) requires specialized monitoring for {rec_vessel}.",
-                f"{dest_name} is physically accessible, but contract timing should be optimized.",
-            ]
+            # BOOK NOW
+            rec_action = "BOOK NOW"
+            if is_alt:
+                action_headline = f"CONTRACT NOW - {rec_vessel.upper()} + ALTERNATIVE DISCHARGE"
+            else:
+                action_headline = f"CONTRACT NOW - {rec_vessel.upper()}"
+
+            if max_delta_pct >= 1.5:
+                timing_reason = (
+                    f"Forecast freight curve indicates rising rates (+{max_delta_pct:.1f}% within selected window, reaching ${max_rate:.2f}/MT); "
+                    f"prompt fixture hedges against freight inflation."
+                )
+            else:
+                timing_reason = (
+                    f"Forecast freight rates are broadly stable within the selected window (${min_rate:.2f} to ${max_rate:.2f}/MT vs current ${cur_rate:.2f}/MT); "
+                    f"execute prompt fixture to secure vessel tonnage at stable rates."
+                )
+
+            reasons = [timing_reason]
+            if is_alt:
+                reasons.extend([
+                    f"{rec_vessel} provides optimal single-voyage payload capacity for {cargo_tonnes:,.0f} MT ({v_spec.dwt_tonnes:,.0f} DWT).",
+                    f"Direct {dest_name} berth access is draft-constrained (port max {dest_prof.max_draft_m}m vs {v_spec.draft_m}m vessel draft); viable via offshore lighterage / deepwater transshipment.",
+                    f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and {window_eval['risk']} risk.",
+                    "Commercial freight rate quotes and lighterage service agreements remain subject to charterparty terms.",
+                    "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
+                ])
+            else:
+                reasons.extend([
+                    f"{rec_vessel} passes all physical draft ({v_spec.draft_m}m) and berth restrictions at {dest_name} (max draft {dest_prof.max_draft_m}m).",
+                    f"Cargo quantity ({cargo_tonnes:,.0f} MT) perfectly aligns with {rec_vessel} deadweight payload capacity.",
+                    f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and {window_eval['risk']} risk.",
+                    "Commercial freight rate quotes and complete voyage-cost settlement remain required for final bottom-line profit calculation.",
+                    "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
+                ])
+
+    recommendation = {
+        "action": rec_action,
+        "headline": action_headline,
+        "reasons": reasons,
+    }
 
     # 7. Data Quality & Provenance Summary
     scenario_assumptions_list = [
