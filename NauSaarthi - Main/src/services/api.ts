@@ -92,7 +92,7 @@ export async function analyzeCharteringRequirement(
   const isSevenDays = input.charteringWindow === 'within_7_days';
 
   const payload = {
-    cargo_type: 'Coal',
+    cargo_type: input.cargoType || 'Coal',
     cargo_tonnes: Number(input.cargoQuantityMT),
     origin: input.origin,
     destination: input.destination,

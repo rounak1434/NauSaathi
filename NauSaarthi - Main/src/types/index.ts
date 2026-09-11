@@ -27,6 +27,7 @@ export interface CargoRequirement {
   origin: string;
   destination: string;
   charteringWindow: CharteringWindowOption;
+  cargoType?: string;
 }
 
 // ─── Freight Forecast Types ────────────────────────────────────────────
