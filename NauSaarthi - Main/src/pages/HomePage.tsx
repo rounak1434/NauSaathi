@@ -10,7 +10,7 @@ interface Props {
 
 export default function HomePage({ initialValues, onSubmit, loading }: Props) {
   return (
-    <div className="min-h-[calc(100vh-57px)] flex flex-col items-center justify-center px-4 py-8 sm:py-10">
+    <div className="min-h-[calc(100vh-57px)] w-full max-w-6xl mx-auto flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-10">
       {/* Hero */}
       <div className="text-center mb-8 animate-fade-in">
         <div className="flex items-center justify-center gap-3 mb-3">
@@ -28,8 +28,10 @@ export default function HomePage({ initialValues, onSubmit, loading }: Props) {
       </div>
 
       {/* Form */}
-      <div className="w-full animate-fade-in animate-fade-in-delay-1">
-        <InputForm initialValues={initialValues} onSubmit={onSubmit} loading={loading} />
+      <div className="w-full flex justify-center animate-fade-in animate-fade-in-delay-1">
+        <div className="w-full max-w-4xl">
+          <InputForm initialValues={initialValues} onSubmit={onSubmit} loading={loading} />
+        </div>
       </div>
     </div>
   );
