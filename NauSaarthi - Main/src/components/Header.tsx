@@ -9,7 +9,7 @@ interface HeaderProps {
 export default function Header({ activePage, onNavigate, hasAnalysis }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200">
-      <div className="w-full px-6 sm:px-10 lg:px-16 py-3 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onNavigate('overview')}>
           <div className="w-8 h-8 rounded-lg bg-[#1e3a5f] flex items-center justify-center">

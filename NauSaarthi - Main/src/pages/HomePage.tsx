@@ -5,13 +5,14 @@ import type { CargoRequirement } from '../types';
 interface Props {
   initialValues?: Partial<CargoRequirement>;
   onSubmit: (data: CargoRequirement) => void;
+  loading?: boolean;
 }
 
-export default function HomePage({ initialValues, onSubmit }: Props) {
+export default function HomePage({ initialValues, onSubmit, loading }: Props) {
   return (
-    <div className="min-h-[calc(100vh-57px)] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-[calc(100vh-57px)] flex flex-col items-center justify-center px-4 py-8 sm:py-10">
       {/* Hero */}
-      <div className="text-center mb-10 animate-fade-in">
+      <div className="text-center mb-8 animate-fade-in">
         <div className="flex items-center justify-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
             <Anchor className="w-5 h-5 text-white" strokeWidth={2.2} />
@@ -27,8 +28,8 @@ export default function HomePage({ initialValues, onSubmit }: Props) {
       </div>
 
       {/* Form */}
-      <div className="w-full max-w-2xl mx-auto animate-fade-in animate-fade-in-delay-1">
-        <InputForm initialValues={initialValues} onSubmit={onSubmit} />
+      <div className="w-full animate-fade-in animate-fade-in-delay-1">
+        <InputForm initialValues={initialValues} onSubmit={onSubmit} loading={loading} />
       </div>
     </div>
   );

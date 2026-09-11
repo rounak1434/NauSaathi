@@ -20,7 +20,7 @@ export default function AnalysisPage({ analysis, onModifyInputs, onNewAnalysis }
     CHARTERING_WINDOW_LABELS[input.charteringWindow] ?? input.charteringWindow;
 
   return (
-    <div className="w-full px-6 sm:px-10 lg:px-16 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       {/* Page header */}
       <div className="mb-8 animate-fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

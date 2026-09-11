@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
-import { ChevronDown, Search, ArrowRight } from 'lucide-react';
+import { ChevronDown, Search, ArrowRight, Loader2 } from 'lucide-react';
 import type { CargoRequirement, CharteringWindowOption } from '../types';
 import { ORIGIN_OPTIONS, DESTINATION_PORTS, CHARTERING_WINDOW_LABELS } from '../data/locations';
 
 interface InputFormProps {
   initialValues?: Partial<CargoRequirement>;
   onSubmit: (data: CargoRequirement) => void;
+  loading?: boolean;
 }
 
 // ─── Searchable Dropdown ───────────────────────────────────────────────
@@ -50,16 +51,16 @@ function SearchableDropdown({
       <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1">
         {label}
       </label>
-      <p className="text-xs text-gray-400 mb-2">{helper}</p>
+      <p className="text-xs text-gray-400 mb-2 h-4">{helper}</p>
       <button
         type="button"
         id={id}
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between px-4 py-3 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${
-          error ? 'border-red-300' : 'border-gray-200'
+        className={`w-full h-11 flex items-center justify-between px-4 bg-white border rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${
+          error ? 'border-red-300' : 'border-gray-200 hover:border-gray-300'
         }`}
       >
-        <span className={value ? 'text-gray-900' : 'text-gray-400'}>
+        <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>
           {value || placeholder}
         </span>
         <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -105,14 +106,14 @@ function SearchableDropdown({
 
 // ─── Main Input Form ───────────────────────────────────────────────────
 
-export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
+export default function InputForm({ initialValues, onSubmit, loading = false }: InputFormProps) {
   const [cargoQty, setCargoQty] = useState(
-    initialValues?.cargoQuantityMT?.toLocaleString() ?? ''
+    initialValues?.cargoQuantityMT?.toLocaleString() ?? '75,000'
   );
-  const [origin, setOrigin] = useState(initialValues?.origin ?? '');
-  const [destination, setDestination] = useState(initialValues?.destination ?? '');
+  const [origin, setOrigin] = useState(initialValues?.origin ?? 'Australia');
+  const [destination, setDestination] = useState(initialValues?.destination ?? 'Dhamra');
   const [window, setWindow] = useState<CharteringWindowOption | ''>(
-    initialValues?.charteringWindow ?? ''
+    initialValues?.charteringWindow ?? 'within_30_days'
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -131,6 +132,9 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
     if (!cargoQty || isNaN(qty) || qty <= 0) {
       e.cargoQty = 'Please enter a valid cargo quantity.';
     }
+    if (qty > 500000) {
+      e.cargoQty = 'Cargo quantity cannot exceed 500,000 MT.';
+    }
     if (!origin) e.origin = 'Please select an origin.';
     if (!destination) e.destination = 'Please select a destination port.';
     if (!window) e.window = 'Please select a chartering window.';
@@ -139,6 +143,8 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
+
     const errs = validate();
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -152,13 +158,16 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-        <h2 className="text-xl font-bold text-[#1e3a5f] mb-1">Chartering Requirement</h2>
-        <p className="text-sm text-gray-400 mb-8">
-          Enter your cargo and route details to analyse freight price, vessel suitability and
-          chartering time.
-        </p>
+    <form onSubmit={handleSubmit} className="w-full max-w-4xl mx-auto">
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-7 sm:p-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-8">
+          <div>
+            <h2 className="text-xl font-bold text-[#1e3a5f]">Chartering Requirement</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Enter your cargo and route details to analyse freight price, vessel suitability, and ideal chartering time.
+            </p>
+          </div>
+        </div>
 
         <div className="space-y-6">
           {/* Cargo Quantity */}
@@ -167,9 +176,9 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
               Cargo Quantity
             </label>
             <p className="text-xs text-gray-400 mb-2">
-              Enter the quantity of cargo to be imported.
+              Enter the quantity of cargo (coal) to be imported in metric tonnes.
             </p>
-            <div className="flex">
+            <div className="flex max-w-md">
               <input
                 id="cargo-qty"
                 type="text"
@@ -177,11 +186,11 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
                 value={cargoQty}
                 onChange={(e) => setCargoQty(formatNumber(e.target.value))}
                 placeholder="e.g. 75,000"
-                className={`flex-1 px-4 py-3 bg-white border rounded-l-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${
-                  errors.cargoQty ? 'border-red-300' : 'border-gray-200'
+                className={`flex-1 h-11 px-4 bg-white border rounded-l-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] ${
+                  errors.cargoQty ? 'border-red-300' : 'border-gray-200 hover:border-gray-300'
                 }`}
               />
-              <span className="inline-flex items-center px-4 py-3 bg-gray-50 border border-l-0 border-gray-200 rounded-r-lg text-sm font-medium text-gray-500">
+              <span className="inline-flex items-center px-4 h-11 bg-gray-50 border border-l-0 border-gray-200 rounded-r-lg text-sm font-semibold text-gray-600">
                 MT
               </span>
             </div>
@@ -190,29 +199,44 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
             )}
           </div>
 
-          {/* Origin */}
-          <SearchableDropdown
-            id="origin"
-            label="Loading / Origin"
-            helper="Select the overseas location where the cargo will be loaded."
-            placeholder="Select origin country"
-            options={originOptions}
-            value={origin}
-            onChange={setOrigin}
-            error={errors.origin}
-          />
+          {/* Origin and Destination side by side on wider screens */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Origin */}
+            <SearchableDropdown
+              id="origin"
+              label="Loading / Origin"
+              helper="Country where the cargo will be loaded."
+              placeholder="Select origin country"
+              options={originOptions}
+              value={origin}
+              onChange={(val) => {
+                setOrigin(val);
+                if (errors.route) setErrors((prev) => { const n = { ...prev }; delete n.route; return n; });
+              }}
+              error={errors.origin}
+            />
 
-          {/* Destination */}
-          <SearchableDropdown
-            id="destination"
-            label="Discharge / Destination Port"
-            helper="Select the East Coast Indian port where the cargo will arrive."
-            placeholder="Select destination port"
-            options={destinationOptions}
-            value={destination}
-            onChange={setDestination}
-            error={errors.destination}
-          />
+            {/* Destination */}
+            <SearchableDropdown
+              id="destination"
+              label="Discharge / Destination Port"
+              helper="East Coast Indian port for cargo arrival."
+              placeholder="Select destination port"
+              options={destinationOptions}
+              value={destination}
+              onChange={(val) => {
+                setDestination(val);
+                if (errors.route) setErrors((prev) => { const n = { ...prev }; delete n.route; return n; });
+              }}
+              error={errors.destination}
+            />
+          </div>
+
+          {errors.route && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
+              {errors.route}
+            </div>
+          )}
 
           {/* Chartering Window */}
           <div>
@@ -222,26 +246,23 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
             <p className="text-xs text-gray-400 mb-2">
               When do you expect to charter the vessel?
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(Object.entries(CHARTERING_WINDOW_LABELS) as [CharteringWindowOption, string][]).map(
-                ([key, label]) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(Object.entries(CHARTERING_WINDOW_LABELS) as [CharteringWindowOption, string][])
+                .filter(([key]) => key !== 'custom')
+                .map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
-                    disabled={key === 'custom'}
                     onClick={() => setWindow(key)}
-                    className={`px-3 py-2.5 text-sm rounded-lg border transition-all ${
+                    className={`h-11 px-3 text-sm rounded-lg border transition-all ${
                       window === key
-                        ? 'border-[#1e3a5f] bg-[#eef2ff] text-[#1e3a5f] font-semibold'
-                        : key === 'custom'
-                          ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        ? 'border-[#1e3a5f] bg-[#eef2ff] text-[#1e3a5f] font-semibold ring-1 ring-[#1e3a5f]'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     {label}
                   </button>
-                )
-              )}
+                ))}
             </div>
             {errors.window && (
               <p className="text-xs text-red-500 mt-1.5">{errors.window}</p>
@@ -249,14 +270,30 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
           </div>
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          className="mt-10 w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#162d4a] active:bg-[#0f2137] transition-colors"
-        >
-          Analyze with NauSaarthi
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        {/* Submit Section */}
+        <div className="mt-9">
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full h-12 flex items-center justify-center gap-2 px-6 text-white text-sm font-semibold rounded-xl transition-all shadow-sm ${
+              loading
+                ? 'bg-[#1e3a5f]/70 cursor-not-allowed'
+                : 'bg-[#1e3a5f] hover:bg-[#162d4a] active:bg-[#0f2137] hover:shadow'
+            }`}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Analyzing with NauSaathi...
+              </>
+            ) : (
+              <>
+                Analyze with NauSaathi
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </form>
   );

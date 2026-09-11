@@ -57,7 +57,7 @@ export default function App() {
       />
 
       {error && (
-        <div className="max-w-2xl mx-auto mt-4 px-4">
+        <div className="max-w-4xl mx-auto mt-6 px-4">
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
             {error}
           </div>
