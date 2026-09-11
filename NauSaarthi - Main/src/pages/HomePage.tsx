@@ -5,16 +5,15 @@ import type { CargoRequirement } from '../types';
 interface Props {
   initialValues?: Partial<CargoRequirement>;
   onSubmit: (data: CargoRequirement) => void;
-  loading?: boolean;
 }
 
-export default function HomePage({ initialValues, onSubmit, loading }: Props) {
+export default function HomePage({ initialValues, onSubmit }: Props) {
   return (
-    <div className="min-h-[calc(100vh-57px)] w-full flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-10">
+    <div className="w-full min-h-[calc(100vh-57px)] flex flex-col justify-center py-10 px-4 sm:px-6">
       {/* Hero */}
-      <div className="w-full flex flex-col items-center text-center mb-8 animate-fade-in">
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center">
+      <div className="w-full text-center mb-8 animate-fade-in flex flex-col items-center justify-center">
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center shadow-sm">
             <Anchor className="w-5 h-5 text-white" strokeWidth={2.2} />
           </div>
           <h1 className="text-2xl font-bold text-[#1e3a5f] tracking-tight">NauSaarthi</h1>
@@ -28,10 +27,8 @@ export default function HomePage({ initialValues, onSubmit, loading }: Props) {
       </div>
 
       {/* Form */}
-      <div className="w-full flex justify-center animate-fade-in animate-fade-in-delay-1">
-        <div className="w-full max-w-4xl">
-          <InputForm initialValues={initialValues} onSubmit={onSubmit} loading={loading} />
-        </div>
+      <div className="w-full max-w-2xl animate-fade-in animate-fade-in-delay-1">
+        <InputForm initialValues={initialValues} onSubmit={onSubmit} />
       </div>
     </div>
   );

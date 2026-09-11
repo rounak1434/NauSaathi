@@ -1,4 +1,4 @@
-import { Ship, Check, X } from 'lucide-react';
+import { Ship, Check, X, AlertTriangle } from 'lucide-react';
 import type { VesselRecommendation as VesselRecType, SuitabilityStatus } from '../types';
 
 interface Props {
@@ -31,18 +31,56 @@ function StatusCell({ status }: { status: SuitabilityStatus }) {
 }
 
 export default function VesselRecommendationCard({ data }: Props) {
+  const isInfeasible =
+    data.recommended === 'No Single-Vessel Fit' ||
+    data.operationalMode === 'INFEASIBLE' ||
+    data.reason.toLowerCase().includes('no vessel');
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-fade-in animate-fade-in-delay-1">
       <h3 className="text-base font-bold text-[#1e3a5f] mb-5">Recommended Vessel</h3>
 
       {/* Hero recommendation */}
-      <div className="bg-[#f0f4ff] border border-[#d4dff7] rounded-lg p-5 mb-6 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-lg bg-[#1e3a5f] flex items-center justify-center flex-shrink-0">
-          <Ship className="w-6 h-6 text-white" />
+      <div
+        className={`${
+          isInfeasible
+            ? 'bg-amber-50 border-amber-300'
+            : 'bg-[#f0f4ff] border-[#d4dff7]'
+        } border rounded-lg p-5 mb-6 flex items-center gap-4`}
+      >
+        <div
+          className={`w-12 h-12 rounded-lg ${
+            isInfeasible ? 'bg-amber-600' : 'bg-[#1e3a5f]'
+          } flex items-center justify-center flex-shrink-0 shadow-sm`}
+        >
+          {isInfeasible ? (
+            <AlertTriangle className="w-6 h-6 text-white" />
+          ) : (
+            <Ship className="w-6 h-6 text-white" />
+          )}
         </div>
         <div>
-          <p className="text-xl font-bold text-[#1e3a5f]">{data.recommended}</p>
-          <p className="text-sm text-gray-500">{data.reason}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p
+              className={`text-xl font-bold ${
+                isInfeasible ? 'text-amber-900' : 'text-[#1e3a5f]'
+              }`}
+            >
+              {data.recommended}
+            </p>
+            {data.operationalMode && (
+              <span
+                className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                  isInfeasible
+                    ? 'bg-amber-200 text-amber-900'
+                    : 'bg-[#1e3a5f] text-white'
+                }`}
+              >
+                {data.operationalMode}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">{data.reason}</p>
         </div>
       </div>
 

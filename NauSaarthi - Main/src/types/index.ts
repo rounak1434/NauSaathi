@@ -78,7 +78,7 @@ export interface VesselRecommendation {
 
 // ─── Chartering Window Types ───────────────────────────────────────────
 
-export type TimingAction = 'BOOK_NOW' | 'WAIT' | 'CHARTER_WITHIN_RANGE';
+export type TimingAction = 'BOOK_NOW' | 'WAIT' | 'CHARTER_WITHIN_RANGE' | 'INFEASIBLE';
 
 export interface CharteringWindowResult {
   action: TimingAction;
@@ -93,7 +93,11 @@ export interface CharteringWindowResult {
 
 // ─── Final Recommendation ──────────────────────────────────────────────
 
-export type RecommendationVerdict = 'BOOK_NOW' | 'WAIT' | 'CONSIDER_ALTERNATIVE_WINDOW';
+export type RecommendationVerdict =
+  | 'BOOK_NOW'
+  | 'WAIT'
+  | 'CONSIDER_ALTERNATIVE_WINDOW'
+  | 'NO_FEASIBLE_SINGLE_VESSEL';
 
 export interface Recommendation {
   verdict: RecommendationVerdict;

@@ -42,7 +42,7 @@ export const DESTINATION_PORTS: DestinationPort[] = [
   { name: 'Gangavaram', state: 'Andhra Pradesh' },
   { name: 'Gopalpur', state: 'Odisha' },
   { name: 'Dhamra', state: 'Odisha' },
-  { name: 'Sagar–Sandheads', state: 'West Bengal' },
+  { name: 'Sagar-Sandheads', state: 'West Bengal' },
   { name: 'Haldia', state: 'West Bengal' },
 ];
 

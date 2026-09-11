@@ -23,9 +23,10 @@ export default function App() {
       const result = await analyzeCharteringRequirement(data);
       setAnalysis(result);
       setView('analysis');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Analysis failed:', err);
-      setError('Something went wrong. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setError(msg);
       setView('overview');
     }
   }
@@ -49,7 +50,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#f8f9fb]">
+    <div className="min-h-screen bg-[#f8f9fb]">
       <Header
         activePage={view === 'analysis' ? 'analysis' : 'overview'}
         onNavigate={handleNavigate}
@@ -57,7 +58,7 @@ export default function App() {
       />
 
       {error && (
-        <div className="max-w-4xl mx-auto mt-6 px-4">
+        <div className="max-w-2xl mx-auto mt-4 px-4">
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
             {error}
           </div>

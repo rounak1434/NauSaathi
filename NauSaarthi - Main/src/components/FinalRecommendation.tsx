@@ -6,15 +6,31 @@ interface Props {
 }
 
 export default function FinalRecommendation({ data }: Props) {
+  const isInfeasible =
+    data.verdict === 'NO_FEASIBLE_SINGLE_VESSEL' ||
+    (Boolean(data.displayLabel) &&
+      (data.displayLabel.toUpperCase().includes('NO FEASIBLE') ||
+        data.displayLabel.toUpperCase().includes('INFEASIBLE')));
+
   const isBookNow =
-    data.verdict === 'BOOK_NOW' ||
-    (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK'));
+    !isInfeasible &&
+    (data.verdict === 'BOOK_NOW' ||
+      (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK')));
 
   const isWait =
-    data.verdict === 'WAIT' ||
-    (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('WAIT'));
+    !isInfeasible &&
+    (data.verdict === 'WAIT' ||
+      (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('WAIT')));
 
-  const selectedConfig = isBookNow
+  const selectedConfig = isInfeasible
+    ? {
+        icon: AlertTriangle,
+        accentBg: 'bg-amber-50',
+        accentBorder: 'border-amber-300',
+        accentText: 'text-amber-900',
+        iconBg: 'bg-amber-600',
+      }
+    : isBookNow
     ? {
         icon: CheckCircle2,
         accentBg: 'bg-emerald-50',
@@ -66,7 +82,11 @@ export default function FinalRecommendation({ data }: Props) {
             <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 leading-relaxed">
               <span
                 className={`mt-1.5 w-1.5 h-1.5 rounded-full ${
-                  isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
+                  isInfeasible
+                    ? 'bg-amber-600'
+                    : isBookNow
+                      ? 'bg-emerald-600'
+                      : 'bg-[#1e3a5f]'
                 } flex-shrink-0`}
               />
               {reason}

@@ -1,29 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ─── Base ────────────────────────────────────────────────────────────── */
 
-@layer base {
-  html {
-    font-size: 16px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-  body {
-    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f8f9fb;
-    color: #1e293b;
-    line-height: 1.6;
-  }
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  #root {
-    width: 100%;
-    min-height: 100vh;
-  }
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f8f9fb;
+  color: #1e293b;
+  line-height: 1.6;
+}
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  }
+button, input, select, textarea, text, tspan, .recharts-text {
+  font-family: inherit;
 }
 
 /* ─── Scrollbar (subtle) ──────────────────────────────────────────────── */

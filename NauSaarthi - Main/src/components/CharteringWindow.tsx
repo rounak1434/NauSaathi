@@ -12,9 +12,16 @@ export default function CharteringWindowCard({ data }: Props) {
   const idealStartPct = ((data.idealWindowStart ?? 0) / totalDays) * 100;
   const idealEndPct = ((data.idealWindowEnd ?? data.timelineDays) / totalDays) * 100;
 
+  const isInfeasible =
+    data.action === 'INFEASIBLE' ||
+    (Boolean(data.displayLabel) &&
+      (data.displayLabel.toUpperCase().includes('NO FEASIBLE') ||
+        data.displayLabel.toUpperCase().includes('INFEASIBLE')));
+
   const isBookNow =
-    data.action === 'BOOK_NOW' ||
-    (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK'));
+    !isInfeasible &&
+    (data.action === 'BOOK_NOW' ||
+      (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK')));
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-fade-in animate-fade-in-delay-2">
@@ -23,14 +30,20 @@ export default function CharteringWindowCard({ data }: Props) {
       {/* Hero action */}
       <div
         className={`${
-          isBookNow
-            ? 'bg-emerald-50 border-emerald-200'
-            : 'bg-[#f0f4ff] border-[#d4dff7]'
+          isInfeasible
+            ? 'bg-amber-50 border-amber-300'
+            : isBookNow
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-[#f0f4ff] border-[#d4dff7]'
         } border rounded-lg p-5 mb-6 flex items-center gap-4`}
       >
         <div
           className={`w-12 h-12 rounded-lg ${
-            isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
+            isInfeasible
+              ? 'bg-amber-600'
+              : isBookNow
+                ? 'bg-emerald-600'
+                : 'bg-[#1e3a5f]'
           } flex items-center justify-center flex-shrink-0 shadow-sm`}
         >
           {isBookNow ? (
@@ -42,7 +55,11 @@ export default function CharteringWindowCard({ data }: Props) {
         <div>
           <p
             className={`text-xl font-bold ${
-              isBookNow ? 'text-emerald-800' : 'text-[#1e3a5f]'
+              isInfeasible
+                ? 'text-amber-900'
+                : isBookNow
+                  ? 'text-emerald-800'
+                  : 'text-[#1e3a5f]'
             }`}
           >
             {data.displayLabel}

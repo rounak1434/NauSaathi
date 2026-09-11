@@ -63,7 +63,7 @@ export async function analyzeCharteringRequirement(
     cargo_type: 'Coal',
     cargo_tonnes: input.cargoQuantityMT,
     origin: input.origin,
-    destination: input.destination,
+    destination: input.destination.replace(/[\u2010-\u2015]/g, '-'),
     contract_duration_months: durationMonths,
     chartering_window: input.charteringWindow,
   };
@@ -295,7 +295,14 @@ export async function analyzeCharteringRequirement(
   const rec = backend.recommendation ?? {};
   const recActionRaw = String(rec.action || '').toUpperCase();
   let verdict: RecommendationVerdict = 'CONSIDER_ALTERNATIVE_WINDOW';
-  if (recActionRaw.includes('WAIT')) {
+  if (
+    recActionRaw.includes('NO FEASIBLE') ||
+    recActionRaw.includes('INFEASIBLE') ||
+    vesselData.operational_mode === 'INFEASIBLE' ||
+    recommendedClass === 'No Single-Vessel Fit'
+  ) {
+    verdict = 'NO_FEASIBLE_SINGLE_VESSEL';
+  } else if (recActionRaw.includes('WAIT')) {
     verdict = 'WAIT';
   } else if (recActionRaw.includes('BOOK')) {
     verdict = 'BOOK_NOW';
