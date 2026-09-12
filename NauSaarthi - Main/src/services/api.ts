@@ -159,6 +159,9 @@ export async function analyzeCharteringRequirement(
   }
 
   const timeline = fc.timeline;
+  // Chart data mapping: 100% data-driven binding from backend forecast timeline.
+  // Each point corresponds directly to the backend's Baltic benchmark (BCI/BPI)
+  // and bunker calibrated freight rate without any synthetic scaling or interpolation.
   const chartData: FreightDataPoint[] = timeline.map(
     (pt: {
       date: string;
