@@ -33,7 +33,18 @@ export interface CargoRequirement {
 // ─── Freight Forecast Types ────────────────────────────────────────────
 
 export type MarketTrend = 'RISING' | 'FALLING' | 'STABLE';
-export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+export type ForecastSignalLevel = 'Strong' | 'Moderate' | 'Weak';
+
+export interface ForecastSignal {
+  signal: ForecastSignalLevel;
+  detail: string;
+  methodology: string;
+  ml_coverage_months: number;
+  total_forward_months: number;
+  coverage_ratio: number;
+  coefficient_of_variation: number;
+  target_is_ml_prediction: boolean;
+}
 
 export interface FreightDataPoint {
   date: string;
@@ -46,12 +57,15 @@ export interface FreightForecast {
   currentRatePerMT: number;
   expectedRatePerMT: number;
   trend: MarketTrend;
-  confidence: ConfidenceLevel;
+  forecastSignal: ForecastSignal | null;
+  forecastSignalLabel: ForecastSignalLevel;
   chartData: FreightDataPoint[];
   currentRateDate?: string;
   expectedRateDate?: string;
   currentRateDataStatus?: string;
   expectedRateDataStatus?: string;
+  rateDeltaPct: number;
+  expectedRateHorizon?: string;
 }
 
 // ─── Vessel Types ──────────────────────────────────────────────────────
@@ -69,6 +83,8 @@ export interface VesselSuitability {
   loaRange?: string;
   beamRange?: string;
   draftRange?: string;
+  portReason?: string;
+  operationalMode?: string;
 }
 
 export interface VesselRecommendation {
@@ -82,6 +98,12 @@ export interface VesselRecommendation {
 
 export type TimingAction = 'BOOK_NOW' | 'WAIT' | 'CHARTER_WITHIN_RANGE' | 'INFEASIBLE';
 
+export interface ScoreBreakdown {
+  methodology: string;
+  formula: string;
+  factors: Record<string, { value: string; contribution: string; unit?: string }>;
+}
+
 export interface CharteringWindowResult {
   action: TimingAction;
   displayLabel: string;
@@ -91,6 +113,19 @@ export interface CharteringWindowResult {
   idealWindowEnd?: number;
   strategyScore?: number;
   risk?: string;
+  scoreBreakdown?: ScoreBreakdown;
+  userWindow?: string;
+  forecastHorizon?: string;
+  suggestedReason?: string;
+}
+
+// ─── Decision Factors ──────────────────────────────────────────────────
+
+export interface DecisionFactor {
+  factor: string;
+  value: string;
+  status: string;
+  detail: string;
 }
 
 // ─── Final Recommendation ──────────────────────────────────────────────
@@ -105,6 +140,8 @@ export interface Recommendation {
   verdict: RecommendationVerdict;
   displayLabel: string;
   reasons: string[];
+  decisionFactors: DecisionFactor[];
+  decisionChain: string;
 }
 
 // ─── Combined Analysis Response ────────────────────────────────────────
@@ -127,6 +164,20 @@ export interface AnalysisResponse {
     tce: number | null;
     financial_status: string;
     provenance: string;
+  };
+  modelValidation?: {
+    primary_model: string;
+    benchmark_model: string;
+    features_used: string[];
+    forecast_horizon: string;
+    validation_status: string;
+    metrics: {
+      MAE: number | null;
+      RMSE: number | null;
+      MAPE: number | null;
+      R_squared: number | null;
+      note: string;
+    };
   };
   dataQuality?: {
     overall_status: string;

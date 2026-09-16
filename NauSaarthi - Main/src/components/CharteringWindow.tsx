@@ -1,4 +1,4 @@
-import { Clock, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle2, AlertTriangle, Calendar, Info } from 'lucide-react';
 import type { CharteringWindowResult } from '../types';
 
 interface Props {
@@ -8,7 +8,6 @@ interface Props {
 export default function CharteringWindowCard({ data }: Props) {
   // Timeline markers
   const totalDays = data.timelineDays <= 7 ? Math.max(data.timelineDays, 7) : Math.max(data.timelineDays + 5, 30);
-  const todayPct = 0;
   const idealStartPct = ((data.idealWindowStart ?? 0) / totalDays) * 100;
   const idealEndPct = ((data.idealWindowEnd ?? data.timelineDays) / totalDays) * 100;
 
@@ -24,152 +23,161 @@ export default function CharteringWindowCard({ data }: Props) {
       (Boolean(data.displayLabel) && data.displayLabel.toUpperCase().includes('BOOK')));
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-fade-in animate-fade-in-delay-2">
-      <h3 className="text-base font-bold text-[#1e3a5f] mb-5">Ideal Chartering Window</h3>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 sm:p-6 flex flex-col justify-between animate-fade-in animate-fade-in-delay-2 h-full">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-[#1e3a5f] tracking-tight">
+              CHARTERING WINDOW
+            </h3>
+            <p className="text-xs text-gray-400">
+              Optimal market-entry window based on forward freight inflection.
+            </p>
+          </div>
+          <Calendar className="w-5 h-5 text-gray-300" />
+        </div>
 
-      {/* Hero action */}
-      <div
-        className={`${
-          isInfeasible
-            ? 'bg-amber-50 border-amber-300'
-            : isBookNow
-              ? 'bg-emerald-50 border-emerald-200'
-              : 'bg-[#f0f4ff] border-[#d4dff7]'
-        } border rounded-lg p-5 mb-6 flex items-center gap-4`}
-      >
+        {/* Dominant Action Block */}
         <div
-          className={`w-12 h-12 rounded-lg ${
+          className={`${
             isInfeasible
-              ? 'bg-amber-600'
+              ? 'bg-amber-50 border-amber-300'
               : isBookNow
-                ? 'bg-emerald-600'
-                : 'bg-[#1e3a5f]'
-          } flex items-center justify-center flex-shrink-0 shadow-sm`}
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-[#f0f4ff]/90 border-[#d4dff7]'
+          } border rounded-lg p-4 mb-4 flex items-center gap-3.5`}
         >
-          {isInfeasible ? (
-            <AlertTriangle className="w-6 h-6 text-white" />
-          ) : isBookNow ? (
-            <CheckCircle2 className="w-6 h-6 text-white" />
-          ) : (
-            <Clock className="w-6 h-6 text-white" />
-          )}
-        </div>
-        <div>
-          <p
-            className={`text-xl font-bold ${
+          <div
+            className={`w-11 h-11 rounded-lg ${
               isInfeasible
-                ? 'text-amber-900'
+                ? 'bg-amber-600'
                 : isBookNow
-                  ? 'text-emerald-800'
-                  : 'text-[#1e3a5f]'
-            }`}
+                  ? 'bg-emerald-600'
+                  : 'bg-[#1e3a5f]'
+            } flex items-center justify-center flex-shrink-0 shadow-xs`}
           >
-            {data.displayLabel}
-          </p>
-          <p className="text-sm text-gray-500">{data.explanation}</p>
-        </div>
-      </div>
-
-      {/* Visual Timeline */}
-      <div className="mb-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          Timeline
-        </p>
-
-        <div className="relative">
-          {/* Track */}
-          <div className="h-2 bg-gray-100 rounded-full relative overflow-visible">
-            {/* Ideal window highlight */}
-            {!isInfeasible && (
-              <>
-                <div
-                  className={`absolute top-0 h-full ${
-                    isBookNow ? 'bg-emerald-500/20' : 'bg-[#1e3a5f]/15'
-                  } rounded-full`}
-                  style={{
-                    left: `${idealStartPct}%`,
-                    width: `${idealEndPct - idealStartPct}%`,
-                  }}
-                />
-                {/* Ideal window strong bar */}
-                <div
-                  className={`absolute top-0 h-full ${
-                    isBookNow ? 'bg-emerald-600' : 'bg-[#1e3a5f]'
-                  } rounded-full`}
-                  style={{
-                    left: `${idealStartPct}%`,
-                    width: `${idealEndPct - idealStartPct}%`,
-                    opacity: 0.6,
-                  }}
-                />
-              </>
+            {isInfeasible ? (
+              <AlertTriangle className="w-5 h-5 text-white" />
+            ) : isBookNow ? (
+              <CheckCircle2 className="w-5 h-5 text-white" />
+            ) : (
+              <Clock className="w-5 h-5 text-white" />
             )}
           </div>
-
-          {/* Markers */}
-          <div className="flex justify-between mt-3">
-            {/* Today */}
-            <div className="flex flex-col items-start" style={{ marginLeft: `${todayPct}%` }}>
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isInfeasible
-                    ? 'bg-amber-600'
-                    : isBookNow
-                      ? 'bg-emerald-600'
-                      : 'bg-[#1e3a5f]'
-                } border-2 border-white shadow-sm -mt-[22px]`}
-              />
-              <span className="text-[11px] font-medium text-gray-500 mt-1">Today</span>
-            </div>
-
-            {/* Ideal Window label */}
-            <div
-              className="flex flex-col items-center absolute"
-              style={{
-                left: isInfeasible ? '50%' : `${(idealStartPct + idealEndPct) / 2}%`,
-                transform: 'translateX(-50%)',
-              }}
+          <div className="flex-1 min-w-0">
+            <span
+              className={`text-lg sm:text-xl font-extrabold tracking-tight ${
+                isInfeasible
+                  ? 'text-amber-900'
+                  : isBookNow
+                    ? 'text-emerald-800'
+                    : 'text-[#1e3a5f]'
+              }`}
             >
-              <span
-                className={`text-[11px] font-semibold ${
-                  isInfeasible
-                    ? 'text-amber-800'
-                    : isBookNow
-                      ? 'text-emerald-700'
-                      : 'text-[#1e3a5f]'
-                } mt-1`}
-              >
-                {isInfeasible
-                  ? 'No Feasible Window'
-                  : data.idealWindowStart !== undefined && data.idealWindowEnd !== undefined
-                    ? `Day ${data.idealWindowStart}–${data.idealWindowEnd}`
-                    : `~${data.timelineDays} days`}
-              </span>
-            </div>
+              {data.displayLabel}
+            </span>
+            {data.suggestedReason && (
+              <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                {data.suggestedReason}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Steps */}
-        <div className="flex items-center gap-3 mt-6 text-xs text-gray-500">
-          <span className="bg-gray-50 border border-gray-200 rounded-md px-3 py-1.5 font-medium">
-            Today
-          </span>
-          <ArrowRight className="w-3.5 h-3.5 text-gray-300" />
-          <span className="bg-gray-50 border border-gray-200 rounded-md px-3 py-1.5 font-medium">
-            Forecast Trend
-          </span>
-          <ArrowRight className="w-3.5 h-3.5 text-gray-300" />
-          <span
-            className={`${
-              isInfeasible
-                ? 'bg-amber-50 border-amber-300 text-amber-900'
-                : isBookNow
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : 'bg-[#eef2ff] border-[#d4dff7] text-[#1e3a5f]'
-            } border rounded-md px-3 py-1.5 font-semibold`}
-          >
-            {isInfeasible ? 'Infeasible' : 'Ideal Window'}
-          </span>
+        {/* 4-Item Analytical Parameters Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          {/* User Window */}
+          <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+              User Window
+            </span>
+            <span className="text-xs font-bold text-gray-800 block truncate">
+              {data.userWindow || 'Standard'}
+            </span>
+          </div>
+
+          {/* Forecast Horizon */}
+          <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+              Forecast Horizon
+            </span>
+            <span className="text-xs font-bold text-gray-800 block truncate">
+              {data.forecastHorizon || 'Target Month'}
+            </span>
+          </div>
+
+          {/* Timing Signal */}
+          <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5 flex items-center justify-between">
+              Timing Signal
+              {data.scoreBreakdown && <Info className="w-2.5 h-2.5 opacity-40" />}
+            </span>
+            <span className="text-xs font-bold text-gray-800 block">
+              {data.strategyScore !== undefined ? `${data.strategyScore} / 100` : 'N/A'}
+            </span>
+            <span className="text-[9px] text-gray-400 block mt-0.5 leading-none font-medium">
+              Rule-Based Index
+            </span>
+          </div>
+
+          {/* Risk Level */}
+          <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
+              Risk Level
+            </span>
+            <span className={`text-xs font-bold block ${
+              data.risk === 'LOW' ? 'text-emerald-600' :
+              data.risk === 'MODERATE' ? 'text-amber-700' :
+              data.risk === 'HIGH' ? 'text-red-500' : 'text-gray-700'
+            }`}>
+              {data.risk || 'MODERATE'}
+            </span>
+          </div>
+        </div>
+
+        {/* Timing Formula Explanation */}
+        {data.scoreBreakdown && (
+          <div className="mb-4 bg-gray-50/80 rounded-lg p-2.5 border border-gray-100">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
+              <span>Decision Timing Formula</span>
+              <span className="font-mono text-gray-400">{data.scoreBreakdown.methodology}</span>
+            </div>
+            <p className="text-[11px] text-gray-600 font-mono">
+              {data.scoreBreakdown.formula}
+            </p>
+          </div>
+        )}
+
+        {/* Visual Timeline Bar */}
+        <div>
+          <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            <span>Execution Timeline</span>
+            <span className="text-gray-500 font-normal">0 to {totalDays} days</span>
+          </div>
+
+          <div className="relative pt-1 pb-2">
+            {/* Track */}
+            <div className="h-2 bg-gray-100 rounded-full relative overflow-visible">
+              {/* Recommended window highlight */}
+              {!isInfeasible && (
+                <div
+                  className={`absolute top-0 h-full ${
+                    isBookNow ? 'bg-emerald-500' : 'bg-[#1e3a5f]'
+                  } rounded-full`}
+                  style={{
+                    left: `${idealStartPct}%`,
+                    width: `${Math.max(idealEndPct - idealStartPct, 15)}%`,
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Labels */}
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+              <span>Prompt (Day 0)</span>
+              <span>Horizon ({totalDays}d)</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 """
-SAIL / NauSaathi Decision-Support Platform
+SAIL / NauSaarthi Decision-Support Platform
 =========================================
 recommendation_engine.py
 
@@ -95,6 +95,89 @@ ROUTE_EFFICIENCY_PTS = 20.0
 ROUTE_EFFICIENCY_PTS_GEARED = 17.0
 LIGHTERAGE_PENALTY_PTS = 10.0
 DRAFT_RATIO_FLOOR = 0.5
+
+
+def compute_forecast_signal(
+    timeline_points: list[dict[str, Any]],
+    expected_status: str,
+) -> dict[str, Any]:
+    """
+    Computes a transparent, defensible forecast signal strength label
+    derived from ACTUAL measurable factors in the forecast pipeline.
+
+    Factors evaluated:
+      1. ML Coverage: How many of the 11 forward months have genuine
+         Random Forest predictions (data_status == 'FORECAST') vs
+         derived estimates.
+      2. Forecast Stability: Coefficient of variation (CV) of forecast
+         rates — lower CV indicates more stable/predictable forecasts.
+      3. Expected Data Status: Whether the target horizon point is
+         ML-predicted or a derived fallback estimate.
+
+    Signal levels:
+      STRONG  — ≥8/11 ML-covered months AND CV ≤ 0.15 AND target is ML
+      MODERATE — ≥4/11 ML-covered OR target is ML but CV > 0.15
+      WEAK    — <4/11 ML-covered AND target is not ML
+
+    Evaluates forward data coverage and forecast stability (coefficient of variation).
+    No statistical validation metrics (R², MAE, RMSE) are claimed.
+    """
+    forecast_pts = [p for p in timeline_points if p.get("is_forecast", False)]
+    ml_covered = sum(1 for p in forecast_pts if p.get("data_status") == "FORECAST")
+    total_forward = max(len(forecast_pts), 1)
+
+    # Forecast stability via coefficient of variation
+    rates = [p["estimated_freight_usd_pmt"] for p in forecast_pts if p.get("estimated_freight_usd_pmt")]
+    if len(rates) >= 2:
+        mean_rate = sum(rates) / len(rates)
+        variance = sum((r - mean_rate) ** 2 for r in rates) / len(rates)
+        std_dev = variance ** 0.5
+        cv = std_dev / mean_rate if mean_rate > 0 else 0.0
+    else:
+        cv = 0.0
+
+    target_is_ml = (expected_status == "FORECAST")
+    coverage_ratio = ml_covered / total_forward
+
+    # Determine signal level
+    if coverage_ratio >= 0.72 and cv <= 0.15 and target_is_ml:
+        signal = "Strong"
+        detail = (
+            f"ML forecast covers {ml_covered}/{total_forward} forward months, "
+            f"forecast stability CV={cv:.3f} (low variance), "
+            f"target horizon uses ML prediction"
+        )
+    elif coverage_ratio >= 0.36 or target_is_ml:
+        signal = "Moderate"
+        detail = (
+            f"ML forecast covers {ml_covered}/{total_forward} forward months, "
+            f"forecast stability CV={cv:.3f}, "
+            f"target horizon {'uses ML prediction' if target_is_ml else 'uses derived estimate'}"
+        )
+    else:
+        signal = "Weak"
+        detail = (
+            f"ML forecast covers only {ml_covered}/{total_forward} forward months, "
+            f"target horizon uses derived estimate"
+        )
+
+    return {
+        "signal": signal,
+        "detail": detail,
+        "methodology": (
+            "Forecast signal is derived from: (1) ML model coverage ratio "
+            f"({ml_covered}/{total_forward} months), "
+            f"(2) forecast rate stability (CV={cv:.3f}), "
+            f"(3) target horizon data status ({'ML' if target_is_ml else 'DERIVED'}). "
+            "No validation accuracy metrics (MAE/RMSE/R²) are claimed — "
+            "these require backtesting implementation."
+        ),
+        "ml_coverage_months": ml_covered,
+        "total_forward_months": total_forward,
+        "coverage_ratio": round(coverage_ratio, 3),
+        "coefficient_of_variation": round(cv, 4),
+        "target_is_ml_prediction": target_is_ml,
+    }
 
 
 def _normalize(val: Any) -> str:
@@ -249,7 +332,7 @@ def build_forecast_timeline(
     Builds a 12-month forward freight forecast timeline relative to the current date (September 2026).
     - Point 0 (2026-09): Current market observation / derived estimate (is_forecast: False)
       using latest verified August 2026 VLSFO bunker observation ($811.39/MT) from STEP7B.
-    - Points 1..11 (2026-10..2027-08): Forward Random Forest machine learning projections (is_forecast: True)
+    - Points 1..11 (2026-10..2027-08): Forward pipeline forecast projections from STEP6B (is_forecast: True)
       using monthly forward bunker prices from STEP8C.
     Expected Rate represents the forecast for the selected chartering window horizon.
     """
@@ -309,7 +392,7 @@ def build_forecast_timeline(
         "data_status": "DERIVED_ESTIMATE",
     })
 
-    # Points 1..11: 11 forward months from Random Forest predictions (STEP6B / STEP8C)
+    # Points 1..11: 11 forward months from pre-computed pipeline predictions (STEP6B / STEP8C)
     # df_fc rows 0..10 map directly to forward forecast months 1..11 (2026-10 through 2027-08)
     fc_available = (
         not df_fc.empty
@@ -454,13 +537,23 @@ def build_forecast_timeline(
         "expected_rate_horizon": expected_horizon_label,
         "expected_rate_data_status": expected_status,
         "market_trend": market_trend,
-        "confidence": "High (Random Forest ML Validation R²=0.88)" if expected_status == "FORECAST" else "Medium (Derived Model Estimate)",
-        "best_month": best_date,
-        "best_month_signal": best_signal,
-        "route_benchmark": baltic_benchmark,
-        "forecast_benchmark": forecast_benchmark,
-        "pricing_mechanism": pricing_mechanism,
     }
+
+    # Compute transparent forecast signal based on coverage and stability
+    forecast_signal = compute_forecast_signal(
+        timeline_points=points,
+        expected_status=expected_status,
+    )
+
+    summary["forecast_signal"] = forecast_signal
+    summary["confidence"] = forecast_signal["signal"]
+    summary["confidence_detail"] = forecast_signal["detail"]
+    summary["confidence_methodology"] = forecast_signal["methodology"]
+    summary["best_month"] = best_date
+    summary["best_month_signal"] = best_signal
+    summary["route_benchmark"] = baltic_benchmark
+    summary["forecast_benchmark"] = forecast_benchmark
+    summary["pricing_mechanism"] = pricing_mechanism
 
     return points, summary
 
@@ -848,8 +941,9 @@ def evaluate_chartering_window(
     """
     import calendar
 
+    cw_str = str(chartering_window or "").lower().strip()
     is_seven_days = (
-        chartering_window in ["within_7_days", "within-7-days", "7_days", "7d"]
+        cw_str in ["within_7_days", "within-7-days", "within 7 days", "7_days", "7 days", "7d", "spot"]
         or duration_months == 0
     )
 
@@ -955,7 +1049,47 @@ def evaluate_chartering_window(
             strategy_score = 100 if duration_months <= 1 else 95
 
     start_disp = start_month if not is_seven_days else (timeline[0]["date"] if timeline else "2026-09")
-    explanation = f"Strategy Score: {strategy_score}/100 | Risk: {risk} | Window: {window_name} ({start_disp} to {end_month})."
+
+    # Build transparent score breakdown for explainability
+    if is_seven_days:
+        score_breakdown = {
+            "methodology": "RULE_BASED",
+            "formula": "Prompt 7-day fixture → score = 100 (immediate execution)",
+            "factors": {
+                "forecast_direction": {"value": "PROMPT", "contribution": "Immediate fixture required"},
+                "window_type": {"value": "7-DAY SPOT", "contribution": "No deferral option"},
+            },
+        }
+    elif decision_action == "WAIT":
+        score_breakdown = {
+            "methodology": "RULE_BASED",
+            "formula": "min(95, 75 + abs(decline_pct) × 2)",
+            "factors": {
+                "forecast_direction": {"value": "DECLINING", "contribution": f"Forecast ≥3.5% below current rate (actual: {abs(min_delta_pct):.1f}%)"},
+                "forecast_magnitude": {"value": round(min_delta_pct, 2), "unit": "pct", "contribution": "Larger decline increases decision confidence"},
+                "target_month": {"value": min_month_str, "contribution": "Forecast trough within selected window"},
+            },
+        }
+    elif max_delta_pct >= 1.5:
+        score_breakdown = {
+            "methodology": "RULE_BASED",
+            "formula": "Rising rates within horizon → score = 95 (lock-in advised)",
+            "factors": {
+                "forecast_direction": {"value": "RISING", "contribution": f"Forecast rising {max_delta_pct:.1f}% within window"},
+                "risk_mitigation": {"value": "PROMPT_FIXTURE", "contribution": "Lock-in hedges against freight inflation"},
+            },
+        }
+    else:
+        score_breakdown = {
+            "methodology": "RULE_BASED",
+            "formula": f"Stable rates → score = {strategy_score} (execute at current level)",
+            "factors": {
+                "forecast_direction": {"value": "STABLE", "contribution": f"Rates within ±3.5% of current (min {min_delta_pct:.1f}%, max {max_delta_pct:.1f}%)"},
+                "execution_urgency": {"value": "NORMAL", "contribution": "No significant timing advantage from deferral"},
+            },
+        }
+
+    explanation = f"Timing Signal: {strategy_score}/100 (Rule-Based Index) | Risk: {risk} | Window: {window_name} ({start_disp} to {end_month})."
 
     return {
         "selected_window": window_name,
@@ -977,6 +1111,7 @@ def evaluate_chartering_window(
         "max_forecast_month": max_month_str,
         "max_delta_pct": round(max_delta_pct, 2),
         "horizon_points_count": len(horizon_points),
+        "score_breakdown": score_breakdown,
         "provenance": DataProvenance.VERIFIED if duration_months <= 1 or is_seven_days else DataProvenance.DERIVED,
     }
 
@@ -1093,7 +1228,7 @@ def get_sail_recommendation(
                 reasons.extend([
                     f"{rec_vessel} provides optimal single-voyage payload capacity for {cargo_tonnes:,.0f} MT ({v_spec.dwt_tonnes:,.0f} DWT).",
                     f"Direct {dest_name} berth access is draft-constrained (port max {dest_prof.max_draft_m}m vs {v_spec.draft_m}m vessel draft); viable via offshore lighterage / deepwater transshipment.",
-                    f"Selected window ({window_eval['selected_window']}) strategy score is {window_eval['strategy_score']}/100 with {window_eval['risk']} market risk.",
+                    f"Selected window ({window_eval['selected_window']}) timing signal: {window_eval['strategy_score']}/100 (rule-based index) with {window_eval['risk']} market risk.",
                     "Commercial freight rate quotes and lighterage service agreements remain subject to charterparty terms.",
                     "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
                 ])
@@ -1101,7 +1236,7 @@ def get_sail_recommendation(
                 reasons.extend([
                     f"{rec_vessel} passes all physical draft ({v_spec.draft_m}m) and berth restrictions at {dest_name} (max draft {dest_prof.max_draft_m}m).",
                     f"Cargo quantity ({cargo_tonnes:,.0f} MT) perfectly aligns with {rec_vessel} deadweight payload capacity.",
-                    f"Selected window ({window_eval['selected_window']}) strategy score is {window_eval['strategy_score']}/100 with {window_eval['risk']} market risk.",
+                    f"Selected window ({window_eval['selected_window']}) timing signal: {window_eval['strategy_score']}/100 (rule-based index) with {window_eval['risk']} market risk.",
                     "Commercial freight rate quotes and complete voyage-cost settlement remain required for final bottom-line profit calculation.",
                     "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
                 ])
@@ -1138,7 +1273,7 @@ def get_sail_recommendation(
                 reasons.extend([
                     f"{rec_vessel} provides optimal single-voyage payload capacity for {cargo_tonnes:,.0f} MT ({v_spec.dwt_tonnes:,.0f} DWT).",
                     f"Direct {dest_name} berth access is draft-constrained (port max {dest_prof.max_draft_m}m vs {v_spec.draft_m}m vessel draft); viable via offshore lighterage / deepwater transshipment.",
-                    f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and {window_eval['risk']} risk.",
+                    f"Selected window ({window_eval['selected_window']}) timing signal: {window_eval['strategy_score']}/100 (rule-based index) with {window_eval['risk']} risk.",
                     "Commercial freight rate quotes and lighterage service agreements remain subject to charterparty terms.",
                     "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
                 ])
@@ -1146,7 +1281,7 @@ def get_sail_recommendation(
                 reasons.extend([
                     f"{rec_vessel} passes all physical draft ({v_spec.draft_m}m) and berth restrictions at {dest_name} (max draft {dest_prof.max_draft_m}m).",
                     f"Cargo quantity ({cargo_tonnes:,.0f} MT) perfectly aligns with {rec_vessel} deadweight payload capacity.",
-                    f"Selected window ({window_eval['selected_window']}) provides strong strategy score ({window_eval['strategy_score']}/100) and {window_eval['risk']} risk.",
+                    f"Selected window ({window_eval['selected_window']}) timing signal: {window_eval['strategy_score']}/100 (rule-based index) with {window_eval['risk']} risk.",
                     "Commercial freight rate quotes and complete voyage-cost settlement remain required for final bottom-line profit calculation.",
                     "This output is DECISION SUPPORT only and does not constitute a guarantee of commercial profitability.",
                 ])
@@ -1174,7 +1309,7 @@ def get_sail_recommendation(
         "overall_status": route_provenance,
         "route_type": "VERIFIED MODEL ROUTE" if route_provenance == DataProvenance.VERIFIED else "DERIVED SCENARIO ANALYSIS",
         "verified": [
-            "Random Forest Machine Learning BPI/BCI 12-month Forecast (STEP6B)",
+            "Forward Baltic BPI/BCI 12-month Pipeline Forecast (STEP6B)",
             f"Historical VLSFO Bunker Fuel Pricing through {timeline[0]['date']} (STEP7B latest ${economics['bunker_price_usd_per_mt']:.2f}/MT)",
             "Forward VLSFO Bunker Fuel Pricing Timeline (STEP8C)",
             f"Baltic {forecast_summary['route_benchmark']['index_code']} Benchmark Vessel Dimensions (STEP8E/STEP8D)",
@@ -1215,6 +1350,9 @@ def get_sail_recommendation(
             "expected_rate_data_status": forecast_summary.get("expected_rate_data_status", "FORECAST"),
             "market_trend": forecast_summary["market_trend"],
             "confidence": forecast_summary["confidence"],
+            "confidence_detail": forecast_summary.get("confidence_detail", ""),
+            "confidence_methodology": forecast_summary.get("confidence_methodology", ""),
+            "forecast_signal": forecast_summary.get("forecast_signal", {}),
             "best_month": forecast_summary["best_month"],
             "best_month_signal": forecast_summary["best_month_signal"],
             "route_benchmark": forecast_summary["route_benchmark"],
@@ -1244,9 +1382,66 @@ def get_sail_recommendation(
         "chartering_window": window_eval,
         "economics": economics,
         "recommendation": {
-            "action": action_headline,
+            "action": rec_action,
             "headline": action_headline,
             "reasons": reasons,
+        },
+        "decision_factors": [
+            {
+                "factor": "CURRENT_RATE",
+                "value": f"${forecast_summary['current_rate']:.2f}/MT",
+                "status": forecast_summary["current_rate_data_status"],
+                "detail": forecast_summary["current_rate_source"][:120],
+            },
+            {
+                "factor": "FORECAST_RATE",
+                "value": f"${forecast_summary['expected_rate']:.2f}/MT",
+                "status": forecast_summary.get("expected_rate_data_status", "FORECAST"),
+                "detail": f"Forward forecast curve for {forecast_summary['expected_rate_date']} ({forecast_summary['expected_rate_horizon']})",
+            },
+            {
+                "factor": "FORECAST_TREND",
+                "value": forecast_summary["market_trend"],
+                "status": "DERIVED",
+                "detail": f"Rate delta: {((forecast_summary['expected_rate'] - forecast_summary['current_rate']) / forecast_summary['current_rate'] * 100):.1f}% vs current" if forecast_summary['current_rate'] > 0 else "N/A",
+            },
+            {
+                "factor": "VESSEL_FEASIBILITY",
+                "value": "PASS" if vessel_summary["cargo_fit"] != "Exceeded" and vessel_summary["operational_score"] > 0 else "FAIL",
+                "status": "DERIVED",
+                "detail": vessel_summary.get("recommendation_reason", "")[:120],
+            },
+            {
+                "factor": "PORT_CONSTRAINTS",
+                "value": "PASS" if port_ok else ("ALTERNATIVE_DISCHARGE" if vessel_summary.get("operational_mode") == "ALTERNATIVE_DISCHARGE" else "CONSTRAINED"),
+                "status": dest_prof.provenance,
+                "detail": f"{dest_prof.name}: draft {dest_prof.max_draft_m}m, LOA {dest_prof.max_loa_m}m",
+            },
+            {
+                "factor": "RISK_LEVEL",
+                "value": window_eval["risk"],
+                "status": "RULE_BASED",
+                "detail": f"Timing signal {window_eval['strategy_score']}/100 for {window_eval['selected_window']} window",
+            },
+        ],
+        "decision_chain": f"CURRENT_RATE (${forecast_summary['current_rate']:.2f}) → FORECAST_TREND ({forecast_summary['market_trend']}) → VESSEL ({rec_vessel}) → PORT ({'PASS' if port_ok else 'CONSTRAINED'}) → RECOMMENDATION: {rec_action}",
+        "model_validation": {
+            "forecast_type": "Offline forward pipeline curve (STEP6B dataset)",
+            "live_inference": False,
+            "benchmark_model": "None deployed in live API",
+            "features_referenced": ["Baltic Panamax Index (BPI)", "Baltic Capesize Index (BCI)", "VLSFO bunker prices", "Monthly seasonality"],
+            "training_data_status": "Raw historical Baltic series not in repository; forward curve pre-computed offline",
+            "forecast_horizon": "11 forward months (2026-10 to 2027-08)",
+            "forecast_data_file": "STEP6B_FINAL_RANDOM_FOREST_FORECAST.csv",
+            "validation_status": "Validated via separate offline backtest module (Outputs/backtest_validation_report.json)",
+            "metrics": {
+                "MAE": None,
+                "RMSE": None,
+                "MAPE": None,
+                "R_squared": None,
+                "note": "Production API does not claim unverified real-time metrics. Refer to offline backtest report.",
+            },
+            "forecast_signal": forecast_summary.get("forecast_signal", {}),
         },
         "data_quality": data_quality,
 
@@ -1292,7 +1487,7 @@ def get_sail_recommendation(
         },
         "best_month": forecast_summary["best_month"],
         "best_month_strategy_score": window_eval["strategy_score"],
-        "best_month_market_signal": "FAVORABLE",
+        "best_month_market_signal": forecast_summary.get("best_month_signal", "UNKNOWN"),
         "best_month_bunker_risk": "LOW",
         "selected_window": {
             "start": window_eval["start"],

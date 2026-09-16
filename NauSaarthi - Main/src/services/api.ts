@@ -5,7 +5,8 @@ import type {
   FreightDataPoint,
   FreightForecast,
   MarketTrend,
-  ConfidenceLevel,
+  ForecastSignalLevel,
+  ForecastSignal,
   VesselClass,
   SuitabilityStatus,
   VesselSuitability,
@@ -14,6 +15,7 @@ import type {
   CharteringWindowResult,
   RecommendationVerdict,
   Recommendation,
+  DecisionFactor,
 } from '../types';
 
 // ─── Configuration ─────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ export async function analyzeCharteringRequirement(
   } catch (netErr: unknown) {
     const msg = netErr instanceof Error ? netErr.message : String(netErr);
     throw new Error(
-      `Unable to connect to SAIL backend at ${API_BASE_URL} (${msg}). Please verify FastAPI is running on http://127.0.0.1:8000.`
+      `Unable to connect to NauSaarthi backend at ${API_BASE_URL} (${msg}). Please verify FastAPI is running on http://127.0.0.1:8000.`
     );
   }
 
@@ -192,24 +194,40 @@ export async function analyzeCharteringRequirement(
     trend = 'RISING';
   }
 
-  const confRaw = String(fc.confidence || '').toUpperCase();
-  let confidence: ConfidenceLevel = 'MEDIUM';
-  if (confRaw.includes('HIGH')) {
-    confidence = 'HIGH';
-  } else if (confRaw.includes('LOW')) {
-    confidence = 'LOW';
+  // Map forecast signal from backend (replaces old HIGH/MEDIUM/LOW confidence)
+  let forecastSignal: ForecastSignal | null = null;
+  let forecastSignalLabel: ForecastSignalLevel = 'Moderate';
+  if (fc.forecast_signal && typeof fc.forecast_signal === 'object') {
+    forecastSignal = fc.forecast_signal as ForecastSignal;
+    forecastSignalLabel = forecastSignal.signal || 'Moderate';
+  } else {
+    // Backward compat: map old string-based confidence
+    const confRaw = String(fc.confidence || '').toLowerCase();
+    if (confRaw.includes('strong') || confRaw.includes('high')) {
+      forecastSignalLabel = 'Strong';
+    } else if (confRaw.includes('weak') || confRaw.includes('low')) {
+      forecastSignalLabel = 'Weak';
+    }
   }
+
+  // Compute rate delta percentage
+  const rateDeltaPct = fc.current_rate > 0
+    ? ((fc.expected_rate - fc.current_rate) / fc.current_rate) * 100
+    : 0;
 
   const freightForecast: FreightForecast = {
     currentRatePerMT: Number(fc.current_rate),
     expectedRatePerMT: Number(fc.expected_rate),
     trend,
-    confidence,
+    forecastSignal,
+    forecastSignalLabel,
     chartData,
     currentRateDate: fc.current_rate_date,
     expectedRateDate: fc.expected_rate_date,
     currentRateDataStatus: fc.current_rate_data_status,
     expectedRateDataStatus: fc.expected_rate_data_status,
+    rateDeltaPct: Math.round(rateDeltaPct * 10) / 10,
+    expectedRateHorizon: fc.expected_rate_horizon,
   };
 
   // 2. Vessel Recommendation validation & mapping
@@ -243,6 +261,7 @@ export async function analyzeCharteringRequirement(
       route_fit?: string;
       port_feasible?: boolean;
       operational_mode?: string;
+      port_reason?: string;
       status?: string;
     }) => {
       const isRec =
@@ -289,6 +308,8 @@ export async function analyzeCharteringRequirement(
         loaRange: v.loa_m ? `${v.loa_m} m` : undefined,
         beamRange: v.beam_m ? `${v.beam_m} m` : undefined,
         draftRange: v.draft_m ? `${v.draft_m} m` : undefined,
+        portReason: v.port_reason || undefined,
+        operationalMode: v.operational_mode || undefined,
       };
     }
   );
@@ -349,7 +370,17 @@ export async function analyzeCharteringRequirement(
     ? (cw.explanation ||
        'Single-vessel chartering is infeasible for the selected cargo and port constraints.')
     : (cw.explanation ||
-       `Strategy Score: ${cw.strategy_score}/100 | Risk: ${cw.risk} | Window: ${cw.selected_window} (${cw.start} to ${cw.end}).`);
+       `Timing Signal: ${cw.strategy_score}/100 (Rule-Based Index) | Risk: ${cw.risk} | Window: ${cw.selected_window} (${cw.start} to ${cw.end}).`);
+
+  // Build suggested reason from chartering window data
+  let suggestedReason = '';
+  if (cwAction === 'WAIT' && cw.min_forecast_month) {
+    suggestedReason = `Forecast indicates lower rates in ${cw.min_forecast_month} (${Math.abs(cw.min_delta_pct || 0).toFixed(1)}% below current)`;
+  } else if (cwAction === 'BOOK_NOW' && cw.max_delta_pct >= 1.5) {
+    suggestedReason = `Forecast indicates rising rates (+${(cw.max_delta_pct || 0).toFixed(1)}% within window)`;
+  } else if (cwAction === 'BOOK_NOW') {
+    suggestedReason = 'Rates broadly stable within window — no timing advantage from deferral';
+  }
 
   const charteringWindow: CharteringWindowResult = {
     action: cwAction,
@@ -360,6 +391,10 @@ export async function analyzeCharteringRequirement(
     idealWindowEnd: idealEnd,
     strategyScore: isSingleVesselInfeasible ? undefined : cw.strategy_score,
     risk: isSingleVesselInfeasible ? 'HIGH' : cw.risk,
+    scoreBreakdown: cw.score_breakdown || undefined,
+    userWindow: cw.selected_window,
+    forecastHorizon: cw.end ? formatMonthLabel(cw.end) : undefined,
+    suggestedReason,
   };
 
   // 4. Recommendation validation & mapping
@@ -378,10 +413,22 @@ export async function analyzeCharteringRequirement(
     verdict = 'BOOK_NOW';
   }
 
+  // Map decision factors from backend
+  const decisionFactors: DecisionFactor[] = Array.isArray(backend.decision_factors)
+    ? backend.decision_factors.map((df: { factor: string; value: string; status: string; detail: string }) => ({
+        factor: df.factor,
+        value: df.value,
+        status: df.status,
+        detail: df.detail,
+      }))
+    : [];
+
   const recommendation: Recommendation = {
     verdict,
     displayLabel: rec.headline || rec.action || 'Decision Support Recommendation',
     reasons: Array.isArray(rec.reasons) ? rec.reasons : [],
+    decisionFactors,
+    decisionChain: backend.decision_chain || '',
   };
 
   return {
@@ -391,6 +438,7 @@ export async function analyzeCharteringRequirement(
     charteringWindow,
     recommendation,
     economics: backend.economics,
+    modelValidation: backend.model_validation,
     dataQuality: backend.data_quality,
     rawBackend: backend,
   };

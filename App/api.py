@@ -1,5 +1,5 @@
 """
-NauSaathi Decision-Support Platform — FastAPI Layer
+SAIL / NauSaarthi Decision-Support Platform — FastAPI Layer
 ===================================================
 
 Exposes:
@@ -56,7 +56,7 @@ from commercial_economics_engine import (
 # ============================================================
 
 API_VERSION = "1.0.0"
-API_TITLE = "NauSaathi Decision-Support API"
+API_TITLE = "NauSaarthi Decision-Support API"
 API_DESCRIPTION = (
     "Intelligent decision-support for bulk cargo procurement "
     "and vessel chartering. "

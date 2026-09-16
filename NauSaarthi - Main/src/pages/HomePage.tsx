@@ -1,4 +1,4 @@
-import { Anchor } from 'lucide-react';
+import { Anchor, ShieldCheck, TrendingDown, Ship } from 'lucide-react';
 import InputForm from '../components/InputForm';
 import type { CargoRequirement } from '../types';
 
@@ -9,26 +9,43 @@ interface Props {
 
 export default function HomePage({ initialValues, onSubmit }: Props) {
   return (
-    <div className="w-full min-h-[calc(100vh-57px)] flex flex-col justify-center py-10 px-4 sm:px-6">
-      {/* Hero */}
-      <div className="w-full text-center mb-8 animate-fade-in flex flex-col items-center justify-center">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center shadow-sm">
-            <Anchor className="w-5 h-5 text-white" strokeWidth={2.2} />
-          </div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f] tracking-tight">NauSaarthi</h1>
+    <div className="w-full min-h-[calc(100vh-60px)] flex flex-col justify-center items-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+      {/* Hero Header */}
+      <div className="w-full max-w-3xl text-center mb-8 animate-fade-in">
+        <div className="inline-flex items-center gap-2.5 px-3 py-1 rounded-full bg-[#eef2ff] border border-[#d4dff7] text-[#1e3a5f] text-xs font-semibold mb-4 shadow-xs">
+          <Anchor className="w-3.5 h-3.5" />
+          <span>SAIL Commercial Decision-Support Platform</span>
         </div>
-        <p className="text-sm font-medium text-gray-500 mb-1">
-          Intelligent Freight Forecasting &amp; Vessel Chartering Intelligence
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1e3a5f] tracking-tight">
+          NauSaarthi
+        </h1>
+        <p className="text-base sm:text-lg font-medium text-gray-700 mt-1">
+          Intelligent Freight &amp; Vessel Chartering Intelligence
         </p>
-        <p className="text-xs text-gray-400">
-          Smarter decisions for bulk vessel chartering
+        <p className="text-xs sm:text-sm text-gray-400 max-w-xl mx-auto mt-1 leading-normal">
+          Evaluate voyage economics, forecast Baltic freight trends, verify physical dual-port constraints, and optimize commercial chartering fixtures.
         </p>
       </div>
 
-      {/* Form */}
-      <div className="w-full max-w-2xl animate-fade-in animate-fade-in-delay-1">
+      {/* Main Intake Form Container */}
+      <div className="w-full max-w-3xl animate-fade-in animate-fade-in-delay-1 shadow-sm">
         <InputForm initialValues={initialValues} onSubmit={onSubmit} />
+      </div>
+
+      {/* Enterprise Feature Badges below Form */}
+      <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-xs text-gray-500 animate-fade-in animate-fade-in-delay-2">
+        <div className="flex items-center gap-2 p-3 bg-white/70 border border-gray-200/80 rounded-lg">
+          <Ship className="w-4 h-4 text-[#1e3a5f] flex-shrink-0" />
+          <span>Dual-port LOA, beam &amp; draft screening</span>
+        </div>
+        <div className="flex items-center gap-2 p-3 bg-white/70 border border-gray-200/80 rounded-lg">
+          <TrendingDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span>12-month forward freight curve analysis</span>
+        </div>
+        <div className="flex items-center gap-2 p-3 bg-white/70 border border-gray-200/80 rounded-lg">
+          <ShieldCheck className="w-4 h-4 text-[#1e3a5f] flex-shrink-0" />
+          <span>Transparent rule-based decision support</span>
+        </div>
       </div>
     </div>
   );
