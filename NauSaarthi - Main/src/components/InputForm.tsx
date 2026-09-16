@@ -153,27 +153,27 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sm:p-8">
-        <div className="border-b border-gray-100 pb-4 mb-6">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-6 sm:p-7">
+        <div className="border-b border-slate-100 pb-4 mb-5">
           <h2 className="text-lg sm:text-xl font-bold text-[#1e3a5f] tracking-tight">
             CHARTERING REQUIREMENT
           </h2>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Specify bulk shipment volume, shipping corridor, and execution timeline for real-time voyage feasibility analysis.
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Specify cargo volume, shipping corridor and chartering timeline.
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Cargo Quantity */}
           <div>
-            <label htmlFor="cargo-qty" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+            <label htmlFor="cargo-qty" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Cargo Quantity
             </label>
-            <p className="text-[11px] text-gray-400 mb-1.5">
+            <p className="text-[11px] text-slate-400 mb-1.5">
               Enter total bulk cargo parcel size in metric tonnes (MT).
             </p>
             <div className="flex rounded-lg shadow-2xs">
-              <span className="inline-flex items-center px-3.5 bg-gray-50 border border-r-0 border-gray-300/80 rounded-l-lg text-gray-400">
+              <span className="inline-flex items-center px-3.5 bg-slate-50 border border-r-0 border-slate-300/80 rounded-l-lg text-slate-400">
                 <Package className="w-4 h-4" />
               </span>
               <input
@@ -184,10 +184,10 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
                 onChange={(e) => setCargoQty(formatNumber(e.target.value))}
                 placeholder="e.g. 95,000"
                 className={`flex-1 px-3.5 py-2.5 bg-white border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] font-medium ${
-                  errors.cargoQty ? 'border-red-300 bg-red-50/20' : 'border-gray-300/80'
+                  errors.cargoQty ? 'border-red-300 bg-red-50/20' : 'border-slate-300/80'
                 }`}
               />
-              <span className="inline-flex items-center px-4 py-2.5 bg-gray-100/70 border border-l-0 border-gray-300/80 rounded-r-lg text-xs font-bold text-gray-600">
+              <span className="inline-flex items-center px-4 py-2.5 bg-slate-100/80 border border-l-0 border-slate-300/80 rounded-r-lg text-xs font-bold text-slate-700">
                 MT
               </span>
             </div>
@@ -197,7 +197,7 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
           </div>
 
           {/* 2-Column Route Selector */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             <SearchableDropdown
               id="origin"
               label="Loading / Origin"
@@ -223,10 +223,10 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
 
           {/* Chartering Window */}
           <div>
-            <label htmlFor="window" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+            <label htmlFor="window" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Required Chartering Window
             </label>
-            <p className="text-[11px] text-gray-400 mb-2">
+            <p className="text-[11px] text-slate-400 mb-2">
               Select your commercial fixture planning horizon.
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -242,7 +242,7 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
                       className={`px-3 py-2.5 text-xs sm:text-sm rounded-lg border transition-all cursor-pointer text-center font-medium ${
                         isSelected
                           ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-xs font-semibold'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
                       {label}
@@ -260,9 +260,9 @@ export default function InputForm({ initialValues, onSubmit }: InputFormProps) {
         {/* Submit */}
         <button
           type="submit"
-          className="mt-8 w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#162d4a] active:bg-[#0f2137] shadow-sm transition-all cursor-pointer hover:shadow-md"
+          className="mt-7 w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#1e3a5f] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#162d4a] active:bg-[#0f2137] shadow-sm transition-all cursor-pointer hover:shadow-md"
         >
-          Analyze with NauSaarthi
+          <span>Analyze with NauSaarthi</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
